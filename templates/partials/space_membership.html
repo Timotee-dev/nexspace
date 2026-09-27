@@ -1,0 +1,9 @@
+{# Join / Leave control for a Space. Context: space, membership #}
+<form method="post" action="{% url 'spaces:membership' space.pk %}" class="inline-form"{% if membership %} data-confirm="Leave {{ space.name }}? Its posts will stop appearing in your feeds."{% endif %}>
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  {% if membership %}
+    <button type="submit" name="action" value="leave" class="btn btn-ghost{% if small %} btn-sm{% endif %}" aria-label="Joined. Leave {{ space.name }}">Joined ✓</button>
+  {% else %}
+    <button type="submit" name="action" value="join" class="btn btn-primary{% if small %} btn-sm{% endif %}">Join</button>
+  {% endif %}
+</form>

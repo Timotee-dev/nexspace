@@ -1,0 +1,29 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Create your account{% endblock %}
+{% block card_class %} wide{% endblock %}
+{% block card %}
+<header>
+  <h1>Create your account</h1>
+  <p>Use any email address you check often. Your matric number is optional.</p>
+</header>
+{% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+{% if not form.fields.department.queryset.exists %}
+<div class="form-errors" role="alert">Sign-up isn't open yet: no departments have been set up. An administrator needs to add one first.</div>
+{% endif %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/field.html" with field=form.full_name %}
+  {% include "partials/field.html" with field=form.email %}
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.department %}
+    {% include "partials/field.html" with field=form.level %}
+  </div>
+  {% include "partials/field.html" with field=form.matric_number optional=True %}
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.password %}
+    {% include "partials/field.html" with field=form.confirm_password %}
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">Create account</button>
+</form>
+<p class="auth-foot">Already on NexSpace? <a href="{% url 'accounts:login' %}">Log in</a></p>
+{% endblock %}

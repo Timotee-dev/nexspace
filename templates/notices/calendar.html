@@ -1,0 +1,24 @@
+{% extends "layouts/app.html" %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Calendar</h1><p>Exams, tests, deadlines and events for your level, courses and Spaces.</p></div>
+  {% if can_publish %}<a class="btn btn-primary" href="{% url 'notices:event-create' %}">Add date</a>{% endif %}
+</div>
+{% if countdowns %}
+<ul class="countdown-strip">
+  {% for event in countdowns %}
+  <li class="countdown-card">
+    <span class="small muted">{% if event.target_course %}{{ event.target_course.code }} {% endif %}{{ event.get_kind_display }}</span>
+    <b class="countdown-big">{% if event.days_left <= 0 %}Today{% else %}{{ event.days_left }} day{{ event.days_left|pluralize }}{% endif %}</b>
+    <span class="small">{{ event.starts_at|date:"F j, Y" }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% for month, events in grouped %}
+<section style="margin-top:24px"><h2 class="section-title">{{ month }}</h2><ul class="event-list">{% for event in events %}{% include "notices/_event.html" %}{% endfor %}</ul></section>
+{% empty %}
+<div class="empty"><h2>Nothing coming up</h2><p>Dates your department and course reps add for your level and courses will show here. Join your courses so you don't miss any.</p><a class="btn btn-ghost" href="{% url 'spaces:courses' %}">Find your courses</a></div>
+{% endfor %}
+{% endblock %}

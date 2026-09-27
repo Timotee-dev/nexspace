@@ -1,0 +1,42 @@
+{% extends "layouts/app.html" %}
+{% load charts %}
+{% block title %}Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<nav class="chip-row" aria-label="Period">
+  <a class="chip-link" href="?days=7" {% if a.days == 7 %}aria-current="true"{% endif %}>7 days</a>
+  <a class="chip-link" href="?days=30" {% if a.days == 30 %}aria-current="true"{% endif %}>30 days</a>
+  <a class="chip-link" href="?days=90" {% if a.days == 90 %}aria-current="true"{% endif %}>90 days</a>
+</nav>
+<dl class="kpi-grid">
+  <div class="kpi"><dt>Members</dt><dd>{{ a.totals.users }}</dd><span>{{ a.totals.new_users }} new · {{ a.totals.verified_pct }}% verified</span></div>
+  <div class="kpi"><dt>Active (7 days)</dt><dd>{{ a.totals.active_7 }}</dd><span>{{ a.totals.active_30 }} in {{ a.days }} days</span></div>
+  <div class="kpi"><dt>Posts</dt><dd>{{ a.totals.posts_period }}</dd><span>{{ a.totals.posts }} all time</span></div>
+  <div class="kpi"><dt>Comments</dt><dd>{{ a.totals.comments_period }}</dd><span>{{ a.totals.votes_period }} votes</span></div>
+  <div class="kpi"><dt>Resources</dt><dd>{{ a.totals.resources }}</dd><span>{{ a.totals.downloads }} downloads</span></div>
+  <div class="kpi"><dt>Reports</dt><dd>{{ a.totals.reports_open }}</dd><span>open · {{ a.totals.reports_resolved }} resolved</span></div>
+  <div class="kpi"><dt>NexAI requests</dt><dd>{{ a.totals.nexai_questions }}</dd><span>in {{ a.days }} days</span></div>
+  <div class="kpi"><dt>Opportunities</dt><dd>{{ a.totals.opportunities_period }}</dd><span>posted in {{ a.days }} days</span></div>
+</dl>
+<div class="chart-grid">
+  <section class="panel"><h2 class="section-title">New members</h2>{% bar_chart a.series.registrations "New members" %}</section>
+  <section class="panel"><h2 class="section-title">Posts</h2>{% bar_chart a.series.posts "Posts" %}</section>
+  <section class="panel"><h2 class="section-title">Comments</h2>{% bar_chart a.series.comments "Comments" %}</section>
+  <section class="panel"><h2 class="section-title">Downloads</h2>{% bar_chart a.series.downloads "Downloads" %}</section>
+</div>
+<div class="chart-grid">
+  <section class="panel"><h2 class="section-title">Popular Spaces</h2>
+    <table class="data-table"><thead><tr><th scope="col">Space</th><th scope="col">Members</th><th scope="col">Posts</th></tr></thead><tbody>
+    {% for s in a.popular_spaces %}<tr><td><a href="{{ s.get_absolute_url }}">{{ s.name }}</a></td><td>{{ s.member_count }}</td><td>{{ s.recent }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No Spaces yet.</td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel"><h2 class="section-title">Popular courses</h2>
+    <table class="data-table"><thead><tr><th scope="col">Course</th><th scope="col">Members</th><th scope="col">Downloads</th></tr></thead><tbody>
+    {% for s in a.popular_courses %}<tr><td><a href="{{ s.get_absolute_url }}">{{ s.course.code }}</a></td><td>{{ s.member_count }}</td><td>{{ s.dl|default:0 }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No courses yet.</td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel"><h2 class="section-title">Members by level</h2>
+    <table class="data-table"><tbody>{% for row in a.levels %}<tr><td>{% if row.level %}{{ row.level }} Level{% else %}No level{% endif %}</td><td>{{ row.n }}</td></tr>{% endfor %}</tbody></table></section>
+</div>
+<p class="small muted">Counts only. NexSpace doesn't track individual browsing for analytics.</p>
+{% endblock %}
+{% block rightbar %}{% endblock %}

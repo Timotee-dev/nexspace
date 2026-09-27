@@ -1,0 +1,13 @@
+<li class="resource-row">
+  <span class="file-ext">{{ resource.extension }}</span>
+  <div class="resource-main">
+    <a class="resource-title" href="{{ resource.get_absolute_url }}">{{ resource.title }}</a>
+    <p class="small muted">{{ resource.course.code }} · {{ resource.get_resource_type_display }}{% if resource.exam_type %} ({{ resource.get_exam_type_display }}){% endif %}{% if resource.session %} · {{ resource.session.name }}{% endif %}{% if resource.semester %} · {{ resource.get_semester_display }}{% endif %}</p>
+    <p class="small resource-meta">
+      {% if resource.rating_count %}<span>★ {{ resource.rating_avg }} ({{ resource.rating_count }})</span>{% else %}<span class="muted">No ratings yet</span>{% endif %}
+      <span class="muted">{{ resource.download_count }} download{{ resource.download_count|pluralize }}</span>
+      {% if resource.is_verified_upload %}<span class="tag tag-official">Course rep</span>{% endif %}
+    </p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="{% url 'resources:download' resource.pk %}" aria-label="Download {{ resource.title }}">Download</a>
+</li>

@@ -1,0 +1,12 @@
+# Core dependencies — all ship Python 3.14 wheels for Windows.
+Django>=6.0,<6.1
+djangorestframework>=3.16
+django-filter>=25.1
+drf-spectacular>=0.28
+dj-database-url>=2.3
+whitenoise>=6.9
+Pillow>=11.3
+python-dotenv>=1.1
+cloudinary>=1.44
+cryptography>=45.0
+pypdf>=5.0

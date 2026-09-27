@@ -1,0 +1,99 @@
+{% load nexspace %}
+{# One post. Context: post (annotated by feed.annotate_for_user), detail (bool) #}
+<article class="post{% if detail %} post-detail{% endif %}{% if post.is_hidden %} post-hidden{% endif %}" id="post-{{ post.pk }}" aria-labelledby="post-{{ post.pk }}-by">
+  <div class="post-side">
+    {% if post.is_anonymous %}
+      <span class="avatar avatar-anon" aria-hidden="true">?</span>
+    {% else %}
+      <a href="{% url 'accounts:profile' post.author.username %}" tabindex="-1" aria-hidden="true">{% include "partials/avatar.html" with person=post.author %}</a>
+    {% endif %}
+  </div>
+  <div class="post-main">
+    <header class="post-head">
+      <span id="post-{{ post.pk }}-by" class="post-by">
+        {% if post.is_anonymous %}<b>Anonymous Student</b>{% if post.author_id == user.pk %} <span class="tag">You</span>{% endif %}
+        {% else %}<a class="post-name" href="{% url 'accounts:profile' post.author.username %}">{{ post.author.full_name }}</a> <span class="post-handle">@{{ post.author.username }}</span>{% endif %}
+      </span>
+      {% if post.space and not hide_space %}<a class="post-space" href="{{ post.space.get_absolute_url }}">{{ post.space.name|truncatechars:28 }}</a>{% endif %}
+      <a class="post-time" href="{{ post.get_absolute_url }}"><time datetime="{{ post.created_at|date:'c' }}" title="{{ post.created_at|date:'j M Y, H:i' }}">{{ post.created_at|ago }}</time></a>
+    </header>
+    {% if post.is_hidden %}<p class="hidden-note">Hidden while moderators review reports. Only you{% if is_moderator %} and moderators{% endif %} can see it.</p>{% endif %}
+    {% if post.is_official or post.kind != "post" %}
+    <p class="post-tags">
+      {% if post.is_official %}<span class="tag tag-official">Official</span>{% endif %}
+      {% if post.kind != "post" %}<span class="tag">{{ post.get_kind_display }}</span>{% endif %}
+      {% if post.kind == "question" and post.accepted_comment_id %}<span class="tag tag-solved">Answered</span>{% endif %}
+    </p>
+    {% endif %}
+
+    {% if post.title %}<h2 class="post-title">{% if detail %}{{ post.title }}{% else %}<a href="{{ post.get_absolute_url }}">{{ post.title }}</a>{% endif %}</h2>{% endif %}
+    {% if post.body %}
+      <div class="post-body">{% if detail or post.body|length <= 480 %}{{ post.body|render_body }}{% else %}{{ post.body|truncatechars:420|render_body }}<a class="read-more" href="{{ post.get_absolute_url }}">Read more</a>{% endif %}</div>
+    {% endif %}
+
+    {% if post.kind == "poll" %}{% include "posts/_poll.html" %}{% endif %}
+    {% if post.kind == "event" and post.event %}
+    <div class="detail-box">
+      <p><b>{{ post.event.starts_at|date:"D j M, H:i" }}</b>{% if post.event.ends_at %} to {{ post.event.ends_at|date:"H:i" }}{% endif %}</p>
+      {% if post.event.location %}<p class="muted small">{{ post.event.location }}</p>{% endif %}
+    </div>
+    {% endif %}
+    {% if post.kind == "opportunity" and post.opportunity %}
+    <div class="detail-box">
+      <p><b>{{ post.opportunity.organization }}</b> · {{ post.opportunity.get_category_display }}{% if post.opportunity.location %} · {{ post.opportunity.location }}{% endif %}</p>
+      {% if post.opportunity.deadline %}<p class="small">Deadline: <b>{{ post.opportunity.deadline|date:"j M Y" }}</b></p>{% endif %}
+      {% if post.opportunity.apply_url %}<a class="btn btn-primary btn-sm" href="{{ post.opportunity.apply_url }}" target="_blank" rel="noopener noreferrer nofollow">Apply</a>{% endif %}
+    </div>
+    {% endif %}
+
+    {% with images=post.images files=post.files %}
+    {% if images %}
+    <div class="post-images count-{{ images|length }}">
+      {% for image in images %}<a href="{% url 'posts:attachment' post.pk image.pk %}" target="_blank" rel="noopener"><img src="{% url 'posts:attachment' post.pk image.pk %}" alt="Image {{ forloop.counter }} attached to this post" loading="lazy"></a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if files %}
+    <ul class="post-files">
+      {% for f in files %}<li><a href="{% url 'posts:attachment' post.pk f.pk %}"><span class="file-ext">{{ f.extension }}</span><span class="file-name">{{ f.original_name }}</span><span class="muted small">{{ f.size|filesize }}</span></a></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+
+    {% if post.topics.all %}
+    <p class="post-topics">{% for t in post.topics.all %}<a href="{% url 'posts:topic' t.slug %}">#{{ t.slug }}</a>{% endfor %}</p>
+    {% endif %}
+
+    <footer class="post-actions">
+      {% include "posts/_vote.html" with kind="post" obj=post up=post.my_vote_up down=post.my_vote_down %}
+      <a class="action" href="{{ post.get_absolute_url }}#comments" aria-label="{{ post.comment_count }} comments"><svg class="icon-sm"><use href="#i-comment"/></svg><span>{{ post.comment_count|compact }}</span></a>
+      <form method="post" action="{% url 'posts:bookmark' post.pk %}" data-bookmark="{{ post.pk }}">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}#post-{{ post.pk }}">
+        <button type="submit" class="action" aria-pressed="{% if post.is_bookmarked %}true{% else %}false{% endif %}" aria-label="Save post"><svg class="icon-sm"><use href="#i-bookmark"/></svg></button>
+      </form>
+      <a class="action" href="{{ post.get_absolute_url }}" data-share="{{ request.scheme }}://{{ request.get_host }}{{ post.get_absolute_url }}" aria-label="Share post"><svg class="icon-sm"><use href="#i-share"/></svg></a>
+      <details class="menu">
+        <summary class="action" aria-label="More options"><svg class="icon-sm"><use href="#i-more"/></svg></summary>
+        <div class="menu-panel">
+          {% if post.author_id == user.pk %}
+          <form method="post" action="{% url 'posts:delete' post.pk %}" data-confirm="Delete this post? This can't be undone.">
+            {% csrf_token %}<button type="submit" class="menu-item danger">Delete post</button>
+          </form>
+          {% else %}
+          <a class="menu-item" href="{% url 'moderation:report' 'post' post.pk %}?next={{ request.get_full_path|urlencode }}">Report post</a>
+          {% endif %}
+          {% if is_moderator and post.author_id != user.pk %}
+          <form method="post" action="{% url 'moderation:action' %}" data-confirm="Remove this post for everyone? The author loses 20 NexScore.">
+            {% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="target_type" value="post"><input type="hidden" name="target_id" value="{{ post.pk }}">
+            <button type="submit" class="menu-item danger">Remove (moderator)</button>
+          </form>
+          {% if post.is_anonymous %}
+          <form method="post" action="{% url 'moderation:reveal' post.pk %}" data-confirm="Reveal who wrote this anonymous post? This is logged.">
+            {% csrf_token %}<button type="submit" class="menu-item">Reveal author (logged)</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </div>
+      </details>
+    </footer>
+  </div>
+</article>

@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}Spaces · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="space-toolbar"><span></span><a class="btn btn-primary btn-sm" href="{% url 'manage:space-create' %}">New Space</a></div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Space</th><th scope="col">Kind</th><th scope="col">Members</th><th scope="col"></th></tr></thead><tbody>
+{% for s in spaces %}<tr><td><a href="{{ s.get_absolute_url }}">{{ s.name }}</a>{% if s.is_official %} <span class="tag tag-official">Official</span>{% endif %}</td><td>{{ s.get_kind_display }}</td><td>{{ s.member_count }}</td>
+<td class="row-actions">{% if not s.course_id %}<a href="{% url 'manage:space-edit' s.pk %}">Edit</a>
+<form method="post" action="{% url 'manage:space-delete' s.pk %}" data-confirm="Delete {{ s.name }}? Its posts stay but lose their Space.">{% csrf_token %}<button class="btn btn-quiet btn-sm">Delete</button></form>{% else %}<span class="small muted">Managed by course</span>{% endif %}</td></tr>
+{% endfor %}</tbody></table></div>
+{% endblock %}
+{% block rightbar %}{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}{{ group.name }}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'groups:list' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Study groups</a></div>
+<header class="space-header">
+  <span class="space-glyph space-glyph-lg" aria-hidden="true"><svg class="icon"><use href="#i-users"/></svg></span>
+  <div class="space-header-text">
+    <h1>{{ group.name }}</h1>
+    {% if group.description %}<p class="muted">{{ group.description }}</p>{% endif %}
+    <p class="small muted">{% if group.course %}<a href="{{ group.course.get_absolute_url }}">{{ group.course.code }}</a> · {% endif %}{{ group.member_count }}/{{ group.member_limit }} members · {% if group.is_open %}Open{% else %}Invite-only{% endif %}</p>
+  </div>
+  <div class="space-header-actions">
+    <form method="post" action="{% url 'groups:membership' group.pk %}"{% if is_member %} data-confirm="Leave {{ group.name }}?"{% endif %}>
+      {% csrf_token %}<input type="hidden" name="invite" value="{{ invite }}">
+      {% if is_member %}<button type="submit" name="action" value="leave" class="btn btn-ghost">Leave</button>
+      {% else %}<button type="submit" name="action" value="join" class="btn btn-primary">Join group</button>{% endif %}
+    </form>
+  </div>
+</header>
+
+<section class="panel stack" style="margin-top:16px" aria-labelledby="meet-title">
+  <h2 id="meet-title" class="section-title">Next meeting</h2>
+  {% if group.next_meeting_at %}
+    <p><b>{{ group.next_meeting_at|date:"l j F, H:i" }}</b>{% if group.meeting_location %} · {{ group.meeting_location }}{% endif %}</p>
+    {% if group.meeting_link and is_member %}<a class="btn btn-ghost btn-sm" href="{{ group.meeting_link }}" target="_blank" rel="noopener noreferrer">Join online meeting</a>{% endif %}
+  {% else %}<p class="muted">No meeting scheduled yet.</p>{% endif %}
+  {% if meeting_form %}
+  <details><summary class="small">Change meeting</summary>
+    <form method="post" action="{% url 'groups:meeting' group.pk %}" class="form" style="margin-top:12px">{% csrf_token %}
+      {% for field in meeting_form %}{% include "partials/field.html" %}{% endfor %}
+      <div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">Save and notify members</button></div>
+    </form>
+  </details>
+  {% endif %}
+  {% if invite_url and not group.is_open %}<p class="small">Invite link: <input class="copy-input" readonly value="{{ invite_url }}" aria-label="Invite link" onclick="this.select()"></p>{% endif %}
+</section>
+
+{% if is_member %}
+<section class="stack" id="discussion" style="margin-top:20px" aria-labelledby="disc-title">
+  <h2 id="disc-title" class="section-title">Discussion</h2>
+  <ol class="group-messages">
+    {% for m in messages_list %}
+    <li><p class="small"><b>{{ m.author.full_name }}</b> <span class="muted">· {{ m.created_at|ago }}</span></p><div class="comment-body">{{ m.body|render_body }}</div></li>
+    {% empty %}<li class="muted small">No messages yet. Say hi and plan your first session.</li>
+    {% endfor %}
+  </ol>
+  {% if user.can_write %}
+  <form method="post" action="{% url 'groups:message' group.pk %}" class="comment-form">{% csrf_token %}
+    <label for="group-msg" class="visually-hidden">Message</label>
+    <textarea id="group-msg" name="body" rows="2" maxlength="1000" required placeholder="Message the group…"></textarea>
+    <div class="comment-form-foot"><span></span><button type="submit" class="btn btn-primary btn-sm">Send</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="stack" style="margin-top:20px"><h2 class="section-title">Members</h2>
+  <ul class="member-list">{% for m in members %}<li><a href="{% url 'accounts:profile' m.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=m.user %}<span><b>{{ m.user.full_name }}</b><span class="small muted">{% if m.is_admin %}Admin{% else %}Member{% endif %}</span></span></a></li>{% endfor %}</ul>
+</section>
+{% endblock %}

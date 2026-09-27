@@ -1,0 +1,31 @@
+{% extends "layouts/app.html" %}
+{% block title %}Spaces{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Spaces</h1><p>Communities in your department.</p></div>
+  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'spaces:create' %}">New Space</a>{% endif %}
+</div>
+<nav class="settings-nav" aria-label="Browse">
+  <a href="{% url 'spaces:list' %}" aria-current="page">Spaces</a>
+  <a href="{% url 'spaces:courses' %}">Courses</a>
+  <a href="{% url 'resources:library' %}">Resources</a>
+</nav>
+
+<section class="stack" aria-labelledby="mine-title">
+  <h2 id="mine-title" class="section-title">Your Spaces</h2>
+  {% if mine %}
+  <ul class="space-grid">{% for space in mine %}{% include "spaces/_card.html" with membership=space.membership %}{% endfor %}</ul>
+  {% else %}
+  <div class="empty empty-sm"><p>You haven't joined any Spaces yet. Join one below to see its posts in your feed.</p></div>
+  {% endif %}
+</section>
+
+<section class="stack" aria-labelledby="discover-title" style="margin-top:32px">
+  <h2 id="discover-title" class="section-title">Discover</h2>
+  {% if discover %}
+  <ul class="space-grid">{% for space in discover %}{% include "spaces/_card.html" with membership=None %}{% endfor %}</ul>
+  {% else %}
+  <div class="empty empty-sm"><p>You've joined every Space in your department. Start a new one for a club, project or study topic.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

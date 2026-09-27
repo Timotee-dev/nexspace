@@ -1,0 +1,4 @@
+# Production (Render). Not needed for local development on Windows.
+-r requirements.txt
+gunicorn>=23.0
+psycopg[binary]>=3.2.10

@@ -1,0 +1,23 @@
+{% extends "layouts/app.html" %}
+{% load nexai %}
+{% block title %}Quiz: {{ resource.title }}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ resource.get_absolute_url }}"><svg class="icon-sm"><use href="#i-back"/></svg>{{ resource.title|truncatechars:40 }}</a></div>
+<div class="page-head"><h1>Quiz yourself</h1><p>{{ resource.course.code }} · {{ resource.title }}. Pick an answer, then reveal it.</p></div>
+<ol class="quiz">
+  {% for q in result.questions %}
+  <li class="panel stack">
+    <p><b>{{ forloop.counter }}. {{ q.question }}</b></p>
+    <fieldset class="quiz-options"><legend class="visually-hidden">Options for question {{ forloop.counter }}</legend>
+      {% for opt in q.options %}<label class="choice"><input type="radio" name="q{{ forloop.parentloop.counter }}"><span class="choice-text">{{ opt }}</span></label>{% endfor %}
+    </fieldset>
+    <details><summary>Show answer</summary>
+      <p class="quiz-answer"><b>{% for opt in q.options %}{% if forloop.counter0 == q.answer %}{{ opt }}{% endif %}{% endfor %}</b></p>
+      <div class="answer small">{{ q.explanation|render_answer:"src" }}</div>
+    </details>
+  </li>
+  {% endfor %}
+</ol>
+{% include "nexai/_sources.html" with sources=result.sources prefix="src" %}
+<form method="post" action="{% url 'nexai:quiz' resource.pk %}" style="margin-top:16px">{% csrf_token %}<button class="btn btn-ghost">New questions</button></form>
+{% endblock %}

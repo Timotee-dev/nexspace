@@ -1,0 +1,54 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ member.full_name }} · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'manage:users' %}"><svg class="icon-sm"><use href="#i-back"/></svg>People</a></div>
+<section class="panel stack">
+  <div class="suggest-person">{% include "partials/avatar.html" with person=member size_class="avatar-lg" %}<span><b class="resource-h1">{{ member.full_name }}</b><span class="muted">@{{ member.username }} · {{ member.email }}</span></span></div>
+  <dl class="stat-row">
+    <div class="stat"><b>{{ member.level_label|default:"—" }}</b><span>Level</span></div>
+    <div class="stat"><b>{{ member.profile.nexscore }}</b><span>NexScore</span></div>
+    <div class="stat"><b>{{ stats.posts }}</b><span>posts</span></div>
+    <div class="stat"><b>{{ stats.comments }}</b><span>comments</span></div>
+    <div class="stat"><b>{{ stats.resources }}</b><span>resources</span></div>
+    <div class="stat"><b>{{ stats.reports_against }}</b><span>reports on account</span></div>
+  </dl>
+  <p class="small muted">Joined {{ member.date_joined|date:"j M Y" }} · Last active {% if member.last_seen_at %}{{ member.last_seen_at|timesince }} ago{% else %}never{% endif %}{% if member.matric_number %} · Matric {{ member.matric_number }}{% endif %}</p>
+  <p class="small">
+    {% if not member.is_active %}<span class="tag tag-urgent">Banned</span>{% elif member.is_suspended %}<span class="tag tag-important">Suspended until {{ member.suspended_until|date:"j M, H:i" }}</span>{% endif %}
+    {% if not member.email_verified %}<span class="tag">Email not verified</span>{% endif %}
+  </p>
+  <a class="small" href="{% url 'accounts:profile' member.username %}">View public profile</a>
+</section>
+
+<section class="panel stack" style="margin-top:16px">
+  <h2 class="section-title">Roles</h2>
+  <ul class="role-list">
+    {% for ra in roles %}
+    <li><span><b>{{ ra.get_role_display }}</b> <span class="small muted">{% if ra.course %}{{ ra.course.code }}{% elif ra.department %}{{ ra.department.name }}{% else %}All departments{% endif %}</span></span>
+      <form method="post" action="{% url 'manage:user-action' member.pk %}" data-confirm="Remove this role?">{% csrf_token %}<input type="hidden" name="action" value="revoke_role"><input type="hidden" name="assignment" value="{{ ra.pk }}"><button type="submit" class="btn btn-quiet btn-sm">Remove</button></form></li>
+    {% empty %}<li class="muted small">Student (no extra roles).</li>{% endfor %}
+  </ul>
+  <form method="post" action="{% url 'manage:user-action' member.pk %}" class="form role-form">{% csrf_token %}<input type="hidden" name="action" value="assign_role">
+    <div class="form-row two">{% include "partials/field.html" with field=role_form.role %}{% include "partials/field.html" with field=role_form.course %}</div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">Assign role</button></div>
+  </form>
+</section>
+
+<section class="panel stack" style="margin-top:16px">
+  <h2 class="section-title">Account actions</h2>
+  <form method="post" action="{% url 'manage:user-action' member.pk %}" class="mod-actions">{% csrf_token %}
+    <label for="note" class="visually-hidden">Note</label><input id="note" name="note" maxlength="500" placeholder="Reason (saved to the moderation log)">
+    <div class="mod-buttons">
+      {% if not member.email_verified %}<button type="submit" name="action" value="verify_email" class="btn btn-ghost btn-sm">Mark email verified</button>{% endif %}
+      {% if member.is_suspended %}<button type="submit" name="action" value="unsuspend" class="btn btn-ghost btn-sm">Lift suspension</button>
+      {% elif member.is_active and member.pk != user.pk %}<button type="submit" name="action" value="suspend" class="btn btn-ghost btn-sm">Suspend 7 days</button>{% endif %}
+      {% if member.is_active and member.pk != user.pk %}<button type="submit" name="action" value="ban" class="btn btn-danger btn-sm" data-confirm-click="Ban {{ member.full_name }}? They'll be logged out and can't log in.">Ban</button>
+      {% elif not member.is_active %}<button type="submit" name="action" value="unban" class="btn btn-ghost btn-sm">Restore account</button>{% endif %}
+    </div>
+    <input type="hidden" name="days" value="7">
+  </form>
+</section>
+{% endblock %}
+{% block rightbar %}{% endblock %}

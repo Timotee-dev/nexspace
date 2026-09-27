@@ -1,0 +1,53 @@
+{% extends "layouts/app.html" %}
+{% load nexai %}
+{% block title %}NexAI{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>NexAI</h1><p>Ask about your course materials. Answers come from what's been uploaded to NexSpace, with sources.</p></div>
+  {% if history %}<form method="post">{% csrf_token %}<input type="hidden" name="course" value="{{ course.slug|default:'' }}"><button name="clear" value="1" class="btn btn-quiet btn-sm">New chat</button></form>{% endif %}
+</div>
+{% if not enabled %}
+<p class="notice-inline">NexAI's writing model isn't switched on for this server, so you'll get the most relevant passages from course materials instead of a written answer.</p>
+{% endif %}
+
+<ol class="chat" aria-live="polite">
+  {% for turn in history %}{% with n=forloop.counter|stringformat:"s" %}{% with p="t"|add:n %}
+  <li class="chat-q"{% if forloop.last %} id="latest"{% endif %}><p>{{ turn.q }}</p>{% if turn.course %}<span class="small muted">{{ turn.course }}</span>{% endif %}</li>
+  <li class="chat-a">
+    <span class="nexai-mark" aria-hidden="true">✦</span>
+    <div class="chat-body">
+      {% if turn.search_only %}
+        {% if turn.sources %}<p>Here are the most relevant passages I found:</p>{% else %}<p>I couldn't find anything about that in your department's materials.</p>{% endif %}
+        {% include "nexai/_sources.html" with sources=turn.sources prefix=p open=True %}
+      {% else %}
+        <div class="answer">{{ turn.a|render_answer:p }}</div>
+        {% include "nexai/_sources.html" with sources=turn.sources prefix=p %}
+      {% endif %}
+    </div>
+  </li>
+  {% endwith %}{% endwith %}{% empty %}
+  <li class="empty">
+    <span class="nexai-mark nexai-mark-lg" aria-hidden="true">✦</span>
+    <h2>What do you want to understand?</h2>
+    <p>Try one of these:</p>
+    <div class="suggest-chips">{% for s in suggestions %}<button type="button" class="chip-link" data-fill-question="{{ s }}">{{ s }}</button>{% endfor %}</div>
+  </li>
+  {% endfor %}
+</ol>
+
+{% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="ask-form" data-no-busy-reset>
+  {% csrf_token %}
+  <label for="nexai-course" class="visually-hidden">Course</label>
+  <select id="nexai-course" name="course">
+    <option value="">All my department's courses</option>
+    {% for c in courses %}<option value="{{ c.slug }}" {% if course and course.pk == c.pk %}selected{% endif %}>{{ c.code }} — {{ c.title|truncatechars:30 }}</option>{% endfor %}
+  </select>
+  <div class="ask-row">
+    <label for="nexai-q" class="visually-hidden">Your question</label>
+    <textarea id="nexai-q" name="question" rows="2" maxlength="600" required placeholder="Ask about a topic, a past question, or your deadlines…"></textarea>
+    <button type="submit" class="btn btn-primary">Ask</button>
+  </div>
+  <p class="small muted">{% if enabled %}{{ remaining }} question{{ remaining|pluralize }} left today · {% endif %}NexAI only uses materials uploaded to your department and can still make mistakes, so check the sources.</p>
+</form>
+{% endblock %}

@@ -1,0 +1,9 @@
+Hi {{ user.get_short_name }},
+
+Confirm your email to start posting, commenting and sharing on NexSpace:
+
+{{ link }}
+
+This link expires in {{ days }} days. If you didn't create a NexSpace account, you can ignore this email.
+
+— NexSpace

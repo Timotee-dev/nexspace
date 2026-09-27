@@ -1,0 +1,32 @@
+{% extends "layouts/app.html" %}
+{% block title %}Courses{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Courses</h1><p>Join your courses to get their materials, discussions and exam dates.</p></div>
+<nav class="settings-nav" aria-label="Browse">
+  <a href="{% url 'spaces:list' %}">Spaces</a>
+  <a href="{% url 'spaces:courses' %}" aria-current="page">Courses</a>
+  <a href="{% url 'resources:library' %}">Resources</a>
+</nav>
+<nav class="chip-row" aria-label="Filter by level">
+  <a class="chip-link" href="?" {% if not level %}aria-current="true"{% endif %}>All levels</a>
+  {% for value, label in levels %}<a class="chip-link" href="?level={{ value }}" {% if level == value|stringformat:"s" %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{% for level_label, courses in grouped.items %}
+<section class="stack" style="margin-top:24px">
+  <h2 class="section-title">{{ level_label }}</h2>
+  <ul class="course-list">
+    {% for course in courses %}
+    <li class="course-row">
+      <a href="{{ course.get_absolute_url }}" class="course-row-link">
+        <span class="course-code">{{ course.code }}</span>
+        <span class="course-row-text"><b>{{ course.title }}</b><span class="small muted">{{ course.get_semester_display }} · {{ course.units }} unit{{ course.units|pluralize }}{% if course.lecturer %} · {{ course.lecturer }}{% endif %}</span></span>
+      </a>
+      {% include "partials/space_membership.html" with space=course.space membership=course.joined small=True %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% empty %}
+<div class="empty"><h2>No courses yet</h2><p>Your department admin adds courses. Once they do, they'll appear here.</p></div>
+{% endfor %}
+{% endblock %}

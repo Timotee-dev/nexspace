@@ -1,0 +1,36 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+{% block title %}Notification settings{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1><p>Choose what you hear about and where.</p></div>
+{% include "accounts/_settings_nav.html" %}
+<form method="post" class="panel form">
+  {% csrf_token %}
+  <table class="pref-table">
+    <thead><tr><th scope="col">Category</th><th scope="col">In app</th><th scope="col">Push</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row"><b>{{ row.label }}</b><span class="small muted">{{ row.help }}</span></th>
+        <td><label class="switch" aria-label="{{ row.label }} in app"><input type="checkbox" name="{{ row.key }}_in_app"{% if row.in_app %} checked{% endif %}><span></span></label></td>
+        <td><label class="switch" aria-label="{{ row.label }} push"><input type="checkbox" name="{{ row.key }}_push"{% if row.push %} checked{% endif %}{% if not push_enabled %} disabled{% endif %}><span></span></label></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="field-help">Critical notifications — urgent or important announcements, exam and test reminders, and deadline reminders you set — always appear in the app.</p>
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Save notification settings</button></div>
+</form>
+
+<section class="panel stack" style="margin-top:16px">
+  <h2 class="section-title">Push notifications on this device</h2>
+  {% if push_enabled %}
+  <p class="muted small">Get alerts even when NexSpace isn't open. {% if device_count %}You have push turned on for {{ device_count }} device{{ device_count|pluralize }}.{% endif %}</p>
+  <div><button type="button" class="btn btn-primary" data-push-toggle data-key="{{ vapid_public_key }}" hidden>Turn on push on this device</button></div>
+  <p class="small muted" data-push-unsupported hidden>This browser doesn't support push notifications. On iPhone, add NexSpace to your Home Screen first.</p>
+  {% else %}
+  <p class="muted small">Push notifications aren't set up on this server yet. You'll still see everything in the app.</p>
+  {% endif %}
+</section>
+{% endblock %}
+{% block page_scripts %}{% if push_enabled %}<script type="module" src="{% static 'js/push.js' %}"></script>{% endif %}{% endblock %}

@@ -1,0 +1,22 @@
+{# Renders one bound field. Pass optional=True to mark it optional. #}
+<div class="field{% if field.errors %} has-error{% endif %}">
+  {% if field.widget_type == "radioselect" %}
+  <fieldset>
+    <legend>{{ field.label }}</legend>
+    {% for radio in field %}
+    <label class="choice">{{ radio.tag }}<span class="choice-text">{{ radio.choice_label }}</span></label>
+    {% endfor %}
+  </fieldset>
+  {% elif field.widget_type == "password" %}
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  <div class="password-wrap">
+    {{ field }}
+    <button type="button" class="icon-btn" data-reveal aria-label="Show password" aria-pressed="false"><svg class="icon-sm"><use href="#i-eye"/></svg></button>
+  </div>
+  {% else %}
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="optional">(optional)</span>{% endif %}</label>
+  {{ field }}
+  {% endif %}
+  {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+  {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+</div>

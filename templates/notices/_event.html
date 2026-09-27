@@ -1,0 +1,9 @@
+<li class="event-row">
+  <span class="event-date"><b>{{ event.starts_at|date:"j" }}</b><small>{{ event.starts_at|date:"M" }}</small></span>
+  <div class="event-main">
+    <p><span class="tag kind-{{ event.kind }}">{{ event.get_kind_display }}</span> <b>{{ event.title }}</b></p>
+    <p class="small muted">{{ event.starts_at|date:"D, H:i" }}{% if event.ends_at %} to {{ event.ends_at|date:"H:i" }}{% endif %}{% if event.location %} · {{ event.location }}{% endif %} · {{ event.audience_label }}</p>
+    {% if event.description %}<p class="small">{{ event.description|linebreaksbr }}</p>{% endif %}
+  </div>
+  {% if event.days_left >= 0 and event.days_left <= 60 %}<span class="event-left">{% if event.days_left == 0 %}Today{% else %}{{ event.days_left }}d{% endif %}</span>{% endif %}
+</li>

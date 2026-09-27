@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="auth">
+  <aside class="auth-brand" aria-hidden="true">
+    <a class="wordmark" href="{% url 'core:home' %}" tabindex="-1"><span class="wordmark-glyph">N</span>NexSpace</a>
+    <div>
+      <h2>Your department. Your people. Your space.</h2>
+      <p>Talk to classmates, find course materials and never miss an announcement.</p>
+    </div>
+    <div class="board">
+      <div class="board-item"><span class="board-dot"></span><span><b>CSC 301</b> past questions uploaded</span></div>
+      <div class="board-item"><span class="board-dot"></span><span><b>300 Level</b> timetable updated</span></div>
+      <div class="board-item"><span class="board-dot"></span><span><b>SIWES</b> placements open</span></div>
+    </div>
+  </aside>
+  <main class="auth-main" id="main">
+    <div class="auth-card{% block card_class %}{% endblock %}">
+      <div class="auth-top">
+        <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span>NexSpace</a>
+        <button type="button" class="icon-btn" data-theme-toggle aria-label="Change theme"><svg class="icon"><use href="#i-theme"/></svg></button>
+      </div>
+      {% block card %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% endblock %}

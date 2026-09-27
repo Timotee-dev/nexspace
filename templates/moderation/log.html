@@ -1,0 +1,14 @@
+{% extends "layouts/app.html" %}
+{% block title %}Moderation log{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'moderation:queue' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Moderation</a></div>
+<div class="page-head"><h1>Moderation log</h1><p>Every moderation action in your department. Only moderators can see this.</p></div>
+<ul class="log-list">
+  {% for a in actions %}
+  <li><span class="small muted">{{ a.created_at|date:"j M Y, H:i" }}</span>
+    <p><b>{% if a.moderator %}{{ a.moderator.full_name }}{% else %}NexSpace{% endif %}</b> — {{ a.get_action_display|lower }} · {{ a.get_target_type_display|lower }} "{{ a.target_label }}"</p>
+    {% if a.note %}<p class="small muted">{{ a.note }}</p>{% endif %}</li>
+  {% empty %}<li class="empty"><p>No actions yet.</p></li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "layouts/app.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<nav class="feed-tabs" aria-label="Feed">
+  <a href="?tab=for-you" {% if tab == "for-you" %}aria-current="page"{% endif %}>For you</a>
+  <a href="?tab=following" {% if tab == "following" %}aria-current="page"{% endif %}>Following</a>
+  <a href="?tab=department" {% if tab == "department" %}aria-current="page"{% endif %}>Department</a>
+</nav>
+
+{% if is_first_page %}
+<a class="compose-prompt" href="{% url 'posts:compose' %}">
+  {% include "partials/avatar.html" with person=user %}
+  <span>Ask a question or share something with your department</span>
+  <span class="btn btn-primary btn-sm" aria-hidden="true">Post</span>
+</a>
+{% if steps_done < steps|length %}
+<a class="setup-nudge" href="{% url 'accounts:profile' user.username %}?tab=about">
+  <span class="meter" aria-hidden="true"><span style="width:{% widthratio steps_done steps|length 100 %}%"></span></span>
+  <span>Finish your profile · {{ steps_done }} of {{ steps|length }} done</span>
+</a>
+{% endif %}
+{% endif %}
+
+{% if is_first_page %}
+{% if tab == "department" and announcements %}
+<ul class="announcement-list compact">
+  {% for item in announcements %}
+  <li class="announcement priority-{{ item.priority }}"><p class="small muted">{% if item.priority != "normal" %}<span class="tag tag-{{ item.priority }}">{{ item.get_priority_display }}</span> {% endif %}Announcement · {{ item.audience_label }}</p><h2><a href="{% url 'notices:announcement' item.pk %}">{{ item.title }}</a></h2></li>
+  {% endfor %}
+</ul>
+{% elif countdowns or announcements %}
+<div class="up-next mobile-tablet-only">
+  {% with event=countdowns.0 %}{% if event %}<a href="{% url 'notices:calendar' %}" class="up-next-item"><b>{% if event.days_left <= 0 %}Today{% else %}{{ event.days_left }}d{% endif %}</b><span>{% if event.target_course %}{{ event.target_course.code }} {% endif %}{{ event.get_kind_display }}</span></a>{% endif %}{% endwith %}
+  {% if announcements %}<a href="{% url 'notices:announcements' %}" class="up-next-item"><b>{{ announcements|length }}</b><span>announcement{{ announcements|length|pluralize }}</span></a>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+<div class="feed" data-feed>
+  {% if posts %}
+    {% include "posts/_feed_page.html" %}
+  {% else %}
+    <section class="empty">
+      <svg class="icon"><use href="#i-home"/></svg>
+      {% if tab == "following" %}
+        <h2>Nothing from people or topics you follow yet</h2>
+        <p>Follow classmates and topics to fill this tab. Suggestions are on the right, or on your classmates' profiles.</p>
+      {% elif tab == "department" %}
+        <h2>No official posts yet</h2>
+        <p>Official updates from your department admins will appear here.</p>
+      {% else %}
+        <h2>Nothing here yet</h2>
+        <p>Be the first person to start the conversation in your department.</p>
+        <a class="btn btn-primary" href="{% url 'posts:compose' %}">Write the first post</a>
+      {% endif %}
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block rightbar %}
+{% include "partials/countdowns.html" %}
+{% if tab != "department" %}{% include "partials/announcement_list.html" %}{% endif %}
+{% if recommended_resources %}
+<section class="panel" aria-labelledby="recres-title">
+  <div class="panel-head"><h2 id="recres-title">For your courses</h2><a href="{% url 'resources:library' %}">Library</a></div>
+  <ul class="notice-list">{% for r in recommended_resources %}<li><a class="notice-link" href="{{ r.get_absolute_url }}"><span class="small muted">{{ r.course.code }} · {{ r.get_resource_type_display }}{% if r.rating_count %} · ★ {{ r.rating_avg }}{% endif %}</span><b>{{ r.title }}</b></a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if suggested_topics %}
+<section class="panel" aria-labelledby="topics-title">
+  <div class="panel-head"><h2 id="topics-title">Topics to follow</h2></div>
+  <ul class="suggest-list">
+    {% for topic in suggested_topics %}
+    <li>
+      <a href="{% url 'posts:topic' topic.slug %}"><b>#{{ topic.slug }}</b><span class="muted small">{{ topic.name }}</span></a>
+      {% include "partials/follow_button.html" with kind="topic" key=topic.slug following=False size="sm" %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if suggested_people %}
+<section class="panel" aria-labelledby="people-title">
+  <div class="panel-head"><h2 id="people-title">People you may know</h2></div>
+  <ul class="suggest-list">
+    {% for person in suggested_people %}
+    <li>
+      <a href="{% url 'accounts:profile' person.username %}" class="suggest-person">{% include "partials/avatar.html" with person=person %}<span><b>{{ person.full_name }}</b><span class="muted small">{{ person.level_label }}</span></span></a>
+      {% include "partials/follow_button.html" with kind="user" key=person.username following=False size="sm" %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

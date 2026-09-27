@@ -1,0 +1,40 @@
+{% extends "layouts/app.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1><p>Your account, sign-in and appearance.</p></div>
+{% include "accounts/_settings_nav.html" %}
+<div class="stack">
+  <section class="panel">
+    <h2 class="section-title">Email</h2>
+    <p>{{ user.email }}</p>
+    <p class="small {% if user.email_verified %}muted{% endif %}" style="margin-top:4px">{% if user.email_verified %}Verified{% else %}Not verified yet — use the banner above to resend the link.{% endif %}</p>
+  </section>
+
+  <form method="post" class="form panel">
+    {% csrf_token %}
+    {% include "partials/field.html" with field=appearance.theme %}
+    <div class="form-actions"><button type="submit" name="save_appearance" class="btn btn-primary">Save appearance</button></div>
+  </form>
+
+  <form method="post" class="form panel" novalidate>
+    {% csrf_token %}
+    <h2 class="section-title">Change password</h2>
+    {% include "partials/field.html" with field=password_form.old_password %}
+    {% include "partials/field.html" with field=password_form.new_password1 %}
+    {% include "partials/field.html" with field=password_form.new_password2 %}
+    <div class="form-actions"><button type="submit" name="change_password" class="btn btn-primary">Change password</button></div>
+  </form>
+
+  <section class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <p>Install NexSpace on this device for a full-screen app and quicker access.</p>
+    <button type="button" class="btn btn-ghost" data-install hidden>Install app</button>
+    <noscript>Use your browser's "Add to Home Screen" option.</noscript>
+  </section>
+
+  <form method="post" action="{% url 'accounts:logout' %}" class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    {% csrf_token %}
+    <p>Log out of NexSpace on this device.</p>
+    <button type="submit" class="btn btn-danger"><svg class="icon-sm"><use href="#i-logout"/></svg>Log out</button>
+  </form>
+</div>
+{% endblock %}

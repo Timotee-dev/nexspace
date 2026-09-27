@@ -1,0 +1,6 @@
+<nav class="settings-nav" aria-label="Settings sections">
+  <a href="{% url 'accounts:settings-profile' %}" {% if section == "profile" %}aria-current="page"{% endif %}>Profile</a>
+  <a href="{% url 'accounts:settings-privacy' %}" {% if section == "privacy" %}aria-current="page"{% endif %}>Privacy</a>
+  <a href="{% url 'notifications:preferences' %}" {% if section == "notifications" %}aria-current="page"{% endif %}>Notifications</a>
+  <a href="{% url 'accounts:settings-account' %}" {% if section == "account" %}aria-current="page"{% endif %}>Account</a>
+</nav>

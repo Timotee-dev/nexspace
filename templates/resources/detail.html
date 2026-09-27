@@ -1,0 +1,56 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}{{ resource.title }}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ resource.course.get_absolute_url }}?tab=resources"><svg class="icon-sm"><use href="#i-back"/></svg>{{ resource.course.code }}</a></div>
+<article class="panel stack">
+  <div class="resource-head">
+    <span class="file-ext file-ext-lg">{{ resource.extension }}</span>
+    <div>
+      <h1 class="resource-h1">{{ resource.title }}</h1>
+      <p class="small muted">{{ resource.course.code }} · {{ resource.get_resource_type_display }}{% if resource.exam_type %} ({{ resource.get_exam_type_display }}){% endif %}{% if resource.session %} · {{ resource.session.name }}{% endif %}{% if resource.semester %} · {{ resource.get_semester_display }}{% endif %}</p>
+    </div>
+  </div>
+  {% if resource.is_hidden %}<p class="hidden-note">Hidden while moderators review reports.</p>{% endif %}
+  {% if resource.description %}<div class="post-body">{{ resource.description|render_body }}</div>{% endif %}
+  <dl class="stat-row">
+    <div class="stat"><b>{% if resource.rating_count %}★ {{ resource.rating_avg }}{% else %}–{% endif %}</b><span>{{ resource.rating_count }} rating{{ resource.rating_count|pluralize }}</span></div>
+    <div class="stat"><b>{{ resource.download_count }}</b><span>download{{ resource.download_count|pluralize }}</span></div>
+    <div class="stat"><b>{{ resource.size|filesize }}</b><span>{{ resource.extension }} file</span></div>
+  </dl>
+  {% if resource.index_error %}<p class="small muted">NexAI: {{ resource.index_error }}</p>{% endif %}
+  <p class="small muted">Uploaded by {% if resource.uploaded_by %}<a href="{% url 'accounts:profile' resource.uploaded_by.username %}">{{ resource.uploaded_by.full_name }}</a>{% else %}a former member{% endif %}{% if resource.is_verified_upload %} <span class="tag tag-official">Course rep</span>{% endif %} · {{ resource.created_at|date:"j M Y" }}</p>
+  <div class="form-actions" style="justify-content:flex-start">
+    <a class="btn btn-primary" href="{% url 'resources:download' resource.pk %}">Download</a>
+    {% if nexai_ready %}
+    <form method="post" action="{% url 'nexai:summary' resource.pk %}">{% csrf_token %}<button class="btn btn-ghost"><span aria-hidden="true">✦</span> Summarise</button></form>
+    <form method="post" action="{% url 'nexai:quiz' resource.pk %}">{% csrf_token %}<button class="btn btn-ghost"><span aria-hidden="true">✦</span> Quiz me</button></form>
+    {% endif %}
+    {% if can_remove %}
+    <form method="post" action="{% url 'resources:remove' resource.pk %}" data-confirm="Remove this resource for everyone?">{% csrf_token %}<button type="submit" class="btn btn-danger">Remove</button></form>
+    {% else %}
+    <a class="btn btn-quiet" href="{% url 'moderation:report' 'resource' resource.pk %}?next={{ request.get_full_path|urlencode }}">Report</a>
+    {% endif %}
+  </div>
+</article>
+
+<section class="stack" id="ratings" style="margin-top:24px" aria-labelledby="ratings-title">
+  <h2 id="ratings-title" class="section-title">Ratings and reviews</h2>
+  {% if resource.uploaded_by_id != user.pk and user.can_write %}
+  <form method="post" action="{% url 'resources:rate' resource.pk %}" class="panel form">
+    {% csrf_token %}
+    <fieldset class="field"><legend>{% if my_rating %}Your rating{% else %}Rate this resource{% endif %}</legend>
+      <div class="stars">{% for radio in rating_form.stars %}<label class="star-option">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}</div>
+    </fieldset>
+    {% include "partials/field.html" with field=rating_form.review %}
+    <div class="form-actions"><button type="submit" class="btn btn-primary">{% if my_rating %}Update rating{% else %}Save rating{% endif %}</button></div>
+  </form>
+  {% endif %}
+  <ul class="reply-list">
+    {% for r in ratings %}
+    <li class="panel"><p class="small"><b>{{ r.user.full_name }}</b> <span class="muted">· {{ r.stars }}★ · {{ r.updated_at|ago }}</span></p><p>{{ r.review }}</p></li>
+    {% empty %}<li class="muted small">No written reviews yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

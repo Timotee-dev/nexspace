@@ -1,0 +1,10 @@
+<li class="space-card">
+  <a href="{{ space.get_absolute_url }}" class="space-card-link">
+    <span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span>
+    <span class="space-card-text">
+      <b>{{ space.name }}</b>
+      <span class="small muted">{% if space.is_official %}Official · {% endif %}{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted{% endif %}</span>
+    </span>
+  </a>
+  {% include "partials/space_membership.html" with space=space membership=membership small=True %}
+</li>

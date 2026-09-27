@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+{% block title %}Privacy{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1><p>Control who sees what on your profile.</p></div>
+{% include "accounts/_settings_nav.html" %}
+<form method="post" class="form panel">
+  {% csrf_token %}
+  {% include "partials/field.html" with field=form.visibility %}
+  <div>
+    <h2 class="section-title">Show on my profile</h2>
+    {% for field in form %}{% if field.name != "visibility" %}
+    <label class="toggle-row" for="{{ field.id_for_label }}">
+      <span>{{ field.label }}</span>
+      <span class="switch">{{ field }}<span></span></span>
+    </label>
+    {% endif %}{% endfor %}
+  </div>
+  <p class="field-help">Your email address and moderation history are never shown to other students.</p>
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Save privacy settings</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% block title %}New Space{% endblock %}
+{% block content %}
+<div class="page-head"><h1>New Space</h1><p>For a club, project, study group topic or anything your classmates care about. You'll be its moderator.</p></div>
+<form method="post" class="form panel">
+  {% csrf_token %}
+  {% if errors %}<div class="form-errors" role="alert">{{ errors|join:" " }}</div>{% endif %}
+  <div class="form-row two">
+    <div class="field"><label for="name">Name</label><input id="name" name="name" maxlength="80" required value="{{ data.name|default:'' }}" placeholder="e.g. Robotics Club"></div>
+    <div class="field"><label for="icon">Icon <span class="optional">(optional emoji)</span></label><input id="icon" name="icon" maxlength="4" value="{{ data.icon|default:'' }}" placeholder="🤖"></div>
+  </div>
+  <div class="field"><label for="description">Description <span class="optional">(optional)</span></label><input id="description" name="description" maxlength="300" value="{{ data.description|default:'' }}"></div>
+  <div class="field"><label for="rules">Rules <span class="optional">(optional)</span></label><textarea id="rules" name="rules" rows="4" maxlength="2000">{{ data.rules|default:'' }}</textarea></div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'spaces:list' %}">Cancel</a><button type="submit" class="btn btn-primary">Create Space</button></div>
+</form>
+{% endblock %}

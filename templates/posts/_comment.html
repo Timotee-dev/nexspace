@@ -1,0 +1,42 @@
+{% load nexspace %}
+<li class="comment{% if post.accepted_comment_id == comment.pk %} accepted{% endif %}" id="c-{{ comment.pk }}">
+  {% if comment.is_deleted %}
+  <p class="comment-deleted">{% if comment.removed_by_moderator %}[removed by a moderator]{% else %}[deleted]{% endif %}</p>
+  {% elif comment.is_hidden and comment.author_id != user.pk and not can_moderate %}
+  <p class="comment-deleted">Hidden while moderators review it.</p>
+  {% else %}
+  <div class="comment-head">
+    <a href="{% url 'accounts:profile' comment.author.username %}" class="comment-author">{% include "partials/avatar.html" with person=comment.author size_class="avatar-sm" %}<b>{{ comment.author.full_name }}</b></a>
+    {% if comment.author_id == post.author_id and not post.is_anonymous %}<span class="tag">Author</span>{% endif %}
+    {% if post.accepted_comment_id == comment.pk %}<span class="tag tag-solved">Accepted answer</span>{% endif %}
+    <time class="muted small" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|ago }}</time>
+  </div>
+  <div class="comment-body">{% if comment.reply_to %}<a class="mention" href="{% url 'accounts:profile' comment.reply_to.username %}">@{{ comment.reply_to.username }}</a> {% endif %}{{ comment.body|render_body }}</div>
+  <div class="comment-actions">
+    {% include "posts/_vote.html" with kind="comment" obj=comment up=comment.my_vote_up down=comment.my_vote_down %}
+    {% if user.can_write %}<button type="button" class="action" data-reply="{{ comment.pk }}" aria-expanded="false" aria-controls="reply-{{ comment.pk }}">Reply</button>{% endif %}
+    {% if is_asker and comment.author_id != user.pk %}
+    <form method="post" action="{% url 'posts:accept' comment.pk %}">{% csrf_token %}<button type="submit" class="action">{% if post.accepted_comment_id == comment.pk %}Unaccept{% else %}Accept answer{% endif %}</button></form>
+    {% endif %}
+    {% if comment.author_id == user.pk %}
+    <form method="post" action="{% url 'posts:comment-delete' comment.pk %}" data-confirm="Delete this comment?">{% csrf_token %}<button type="submit" class="action">Delete</button></form>
+    {% else %}
+    <a class="action" href="{% url 'moderation:report' 'comment' comment.pk %}?next={{ request.get_full_path|urlencode }}">Report</a>
+    {% if can_moderate %}<form method="post" action="{% url 'moderation:action' %}" data-confirm="Remove this comment?">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="target_type" value="comment"><input type="hidden" name="target_id" value="{{ comment.pk }}"><button type="submit" class="action">Remove</button></form>{% endif %}
+    {% endif %}
+  </div>
+  {% if user.can_write %}
+  <form method="post" action="{% url 'posts:comment' post.pk %}" class="comment-form reply-form" id="reply-{{ comment.pk }}" hidden>
+    {% csrf_token %}<input type="hidden" name="parent" value="{{ comment.pk }}">
+    <label for="reply-body-{{ comment.pk }}" class="visually-hidden">Reply to {{ comment.author.full_name }}</label>
+    <textarea id="reply-body-{{ comment.pk }}" name="body" rows="2" maxlength="1000" required placeholder="Reply to {{ comment.author.get_short_name }}…"></textarea>
+    <div class="comment-form-foot"><span></span><button type="submit" class="btn btn-primary btn-sm">Reply</button></div>
+  </form>
+  {% endif %}
+  {% endif %}
+  {% if comment.children %}
+  <ol class="thread nested">
+    {% for comment in comment.children %}{% include "posts/_comment.html" %}{% endfor %}
+  </ol>
+  {% endif %}
+</li>

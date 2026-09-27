@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}The digital home of your department{% endblock %}
+{% block robots %}<meta name="robots" content="index, follow">
+<meta property="og:title" content="NexSpace — the digital home of your department">
+<meta property="og:description" content="Talk to classmates, find course materials and past questions, and never miss an announcement.">
+<meta property="og:type" content="website">{% endblock %}
+{% block body %}
+<div class="landing">
+  <header class="landing-nav">
+    <a class="wordmark" href="{% url 'core:home' %}"><span class="wordmark-glyph">N</span>NexSpace</a>
+    <div class="actions">
+      <button type="button" class="icon-btn" data-theme-toggle aria-label="Change theme"><svg class="icon"><use href="#i-theme"/></svg></button>
+      <a class="btn btn-quiet" href="{% url 'accounts:login' %}">Log in</a>
+    </div>
+  </header>
+  <main class="hero" id="main">
+    <div>
+      <h1>Everything happening in your department, in one place.</h1>
+      <p>Talk to classmates, find course materials and past questions, and never miss an announcement or a deadline.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="{% url 'accounts:signup' %}">Create your account</a>
+        <a class="btn btn-ghost" href="{% url 'accounts:login' %}">I already have one</a>
+      </div>
+    </div>
+    <div class="noticeboard" aria-label="Example notices">
+      <div class="notice pinned"><small>Department · Pinned</small><b>300 Level exam timetable is out</b></div>
+      <div class="notice"><small>CSC 301 · Course rep</small><b>2023/24 past questions uploaded</b></div>
+      <div class="notice"><small>Opportunities</small><b>SIWES placements: 12 companies hiring</b></div>
+      <div class="notice"><small>AI &amp; Machine Learning</small><b>Anyone joining the hackathon this weekend?</b></div>
+    </div>
+  </main>
+  <footer class="landing-foot">NexSpace · Your department. Your people. Your space.</footer>
+</div>
+{% endblock %}

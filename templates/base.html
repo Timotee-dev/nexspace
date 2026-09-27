@@ -1,0 +1,38 @@
+{% load static %}<!doctype html>
+<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ theme_preference }}{% else %}system{% endif %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}NexSpace{% endblock %} · NexSpace</title>
+  <meta name="description" content="{% block description %}NexSpace is the digital home of your department: classmates, course materials, announcements and opportunities in one place.{% endblock %}">
+  {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+  <meta name="theme-color" content="#121a2e">
+  <script>
+    (function () {
+      var root = document.documentElement, pref = root.dataset.themePref;
+      {% if not user.is_authenticated %}try { pref = localStorage.getItem("nexspace-theme") || pref; } catch (e) {}{% endif %}
+      root.dataset.themePref = pref;
+      root.dataset.theme = (pref === "light" || pref === "dark") ? pref
+        : (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23f5c451'/><text x='16' y='22.5' font-family='Arial' font-weight='800' font-size='17' text-anchor='middle' fill='%23221a03'>N</text></svg>">
+  {% block head %}{% endblock %}
+</head>
+<body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}">
+  {% include "partials/icons.html" %}
+  <a class="skip-link" href="#main">Skip to content</a>
+  {% include "partials/messages.html" %}
+  {% block body %}{% endblock %}
+  <script type="module" src="{% static 'js/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

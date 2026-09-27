@@ -1,0 +1,71 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ profile_user.full_name }} (@{{ profile_user.username }}){% endblock %}
+{% block content %}
+<article aria-labelledby="profile-name">
+  <div class="profile-cover" aria-hidden="true"></div>
+  <div class="profile-card">
+    <div class="profile-top">
+      {% include "partials/avatar.html" with person=profile_user size_class="avatar-xl" %}
+      {% if is_owner %}<a class="btn btn-ghost" href="{% url 'accounts:settings-profile' %}">Edit profile</a>
+      {% else %}{% include "partials/follow_button.html" with kind="user" key=profile_user.username following=is_following %}{% endif %}
+    </div>
+    <div class="profile-name">
+      <h1 id="profile-name">{{ profile_user.full_name }}</h1>
+      <p>@{{ profile_user.username }}</p>
+    </div>
+    <div class="profile-meta">
+      {% if profile_user.department %}<span><svg class="icon-sm"><use href="#i-school"/></svg>{{ profile_user.department.name }}</span>{% endif %}
+      {% if profile_user.level %}<span><svg class="icon-sm"><use href="#i-layers"/></svg>{{ profile_user.level_label }}</span>{% endif %}
+      {% if show_matric %}<span><svg class="icon-sm"><use href="#i-lock"/></svg>{{ profile_user.matric_number }}{% if is_owner and not profile.show_matric_number %} (only you){% endif %}</span>{% endif %}
+    </div>
+    {% if not is_owner %}<p class="small" style="margin-top:8px"><a class="muted" href="{% url 'moderation:report' 'user' profile_user.pk %}?next={{ request.get_full_path|urlencode }}">Report account</a></p>{% endif %}
+    {% if profile.bio %}<p class="profile-bio">{{ profile.bio }}</p>{% endif %}
+    <p class="follow-counts"><span><b>{{ following_count }}</b> following</span><span><b data-follower-count>{{ follower_count }}</b> follower{{ follower_count|pluralize }}</span></p>
+    <p style="margin-top:12px"><span class="nexscore" title="NexScore grows as you help others with answers and resources"><b>{{ profile.nexscore }}</b> NexScore</span></p>
+  </div>
+</article>
+
+<nav class="tabs" aria-label="Profile sections">
+  <a href="?tab=posts" {% if tab == "posts" %}aria-current="page"{% endif %}>Posts</a>
+  <a href="?tab=replies" {% if tab == "replies" %}aria-current="page"{% endif %}>Replies</a>
+  <a href="?tab=about" {% if tab == "about" %}aria-current="page"{% endif %}>About</a>
+</nav>
+
+{% if tab == "posts" %}
+<div class="feed">
+  {% for post in posts %}{% include "posts/_post_card.html" %}{% empty %}
+  <section class="empty"><h2>No posts yet</h2><p>{% if is_owner %}Your posts will show up here.{% else %}{{ profile_user.get_short_name }} hasn't posted yet.{% endif %}</p>{% if is_owner %}<a class="btn btn-primary" href="{% url 'posts:compose' %}">Write a post</a>{% endif %}</section>
+  {% endfor %}
+</div>
+{% if is_owner %}<p class="muted small" style="margin-top:12px">Your anonymous posts appear here only for you.</p>{% endif %}
+{% elif tab == "replies" %}
+{% load nexspace %}
+<ol class="reply-list">
+  {% for reply in replies %}
+  <li class="panel">
+    <p class="muted small">On <a href="{{ reply.post.get_absolute_url }}#c-{{ reply.pk }}">{% if reply.post.title %}{{ reply.post.title }}{% else %}{{ reply.post.body|truncatechars:60 }}{% endif %}</a> · {{ reply.created_at|ago }}</p>
+    <div class="comment-body">{{ reply.body|render_body }}</div>
+  </li>
+  {% empty %}
+  <li class="empty"><h2>No replies yet</h2><p>Comments and answers will show up here.</p></li>
+  {% endfor %}
+</ol>
+{% else %}
+<div class="stack">
+  {% if is_owner and completion %}
+  {% include "profiles/_completion.html" with steps=completion %}
+  {% endif %}
+  <section class="panel" aria-labelledby="about-title">
+    <h2 id="about-title" class="visually-hidden">About</h2>
+    <dl class="dl">
+      <div><dt>Skills</dt><dd>{% if profile.skills %}<div class="link-list">{% for skill in profile.skills %}<span class="chip-static">{{ skill }}</span>{% endfor %}</div>{% else %}<span class="muted">No skills listed yet.</span>{% endif %}</dd></div>
+      <div><dt>Interests</dt><dd>{% if interests %}<div class="link-list">{% for topic in interests %}<a class="chip-static" href="{% url 'posts:topic' topic.slug %}">{{ topic.name }}</a>{% endfor %}</div>{% else %}<span class="muted">No interests picked yet.</span>{% endif %}</dd></div>
+      {% if show_links %}
+      <div><dt>Links</dt><dd>{% if profile.social_links %}<div class="link-list">{% for label, url in profile.social_links %}<a class="btn btn-ghost" href="{{ url }}" target="_blank" rel="noopener noreferrer nofollow"><svg class="icon-sm"><use href="#i-link"/></svg>{{ label }}</a>{% endfor %}</div>{% else %}<span class="muted">No links added yet.</span>{% endif %}</dd></div>
+      {% endif %}
+      <div><dt>Joined</dt><dd>{{ profile_user.date_joined|date:"F Y" }}</dd></div>
+    </dl>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

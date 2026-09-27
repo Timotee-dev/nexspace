@@ -1,0 +1,2 @@
+{# Usage: include "partials/avatar.html" with person=user size_class="avatar-lg" #}
+<span class="avatar {{ size_class }}" aria-hidden="true">{% if person.profile.avatar %}<img src="{{ person.profile.avatar.url }}" alt="" loading="lazy">{% else %}{{ person.full_name|slice:":1"|upper }}{% endif %}</span>

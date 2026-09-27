@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+{% block title %}Departments · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Department</th><th scope="col">University</th><th scope="col">Members</th></tr></thead><tbody>
+{% for d in depts %}<tr><td><a href="{% url 'manage:overview' %}?dept={{ d.pk }}">{{ d.name }}</a> <span class="small muted">{{ d.code }}</span></td><td>{{ d.faculty.university.short_name }} · {{ d.faculty.name }}</td><td>{{ d.n }}</td></tr>{% endfor %}
+</tbody></table></div>
+<form method="post" class="form panel" style="margin-top:16px" novalidate>{% csrf_token %}<h2 class="section-title">Add a department</h2>
+  <p class="small muted">Existing universities and faculties are reused when the short name or faculty name matches.</p>
+  {% for field in form %}{% include "partials/field.html" %}{% endfor %}
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Add department</button></div>
+</form>
+{% endblock %}
+{% block rightbar %}{% endblock %}

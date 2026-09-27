@@ -1,0 +1,11 @@
+{% extends "layouts/app.html" %}
+{% block title %}New study group{% endblock %}
+{% block content %}
+<div class="page-head"><h1>New study group</h1><p>You'll be the group's admin.</p></div>
+<form method="post" class="form panel" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% for field in form %}{% include "partials/field.html" %}{% endfor %}
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'groups:list' %}">Cancel</a><button type="submit" class="btn btn-primary">Create group</button></div>
+</form>
+{% endblock %}

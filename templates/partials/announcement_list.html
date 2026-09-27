@@ -1,0 +1,13 @@
+{% if announcements %}
+<section class="panel" aria-labelledby="ann-title">
+  <div class="panel-head"><h2 id="ann-title">Announcements</h2><a href="{% url 'notices:announcements' %}">All</a></div>
+  <ul class="notice-list">
+    {% for item in announcements %}
+    <li><a href="{% url 'notices:announcement' item.pk %}" class="notice-link priority-{{ item.priority }}">
+      <span class="small muted">{% if item.priority != "normal" %}<span class="tag tag-{{ item.priority }}">{{ item.get_priority_display }}</span> {% endif %}{{ item.audience_label }} · {{ item.created_at|date:"j M" }}</span>
+      <b>{{ item.title }}</b>
+    </a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

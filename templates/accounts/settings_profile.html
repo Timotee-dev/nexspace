@@ -1,0 +1,45 @@
+{% extends "layouts/app.html" %}
+{% block title %}Edit profile{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1><p>Edit how you appear to your department.</p></div>
+{% include "accounts/_settings_nav.html" %}
+<form method="post" enctype="multipart/form-data" class="form panel" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="field{% if form.avatar.errors %} has-error{% endif %}">
+    <span class="field-label" style="font-size:var(--fs-sm);font-weight:600">Profile photo</span>
+    <div class="avatar-edit">
+      <span data-avatar-preview>{% include "partials/avatar.html" with person=user size_class="avatar-lg" %}</span>
+      <div class="avatar-edit-actions">
+        <label class="btn btn-ghost file-btn">Upload photo<input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" data-avatar-input aria-label="Upload profile photo"></label>
+        {% if user.profile.avatar %}<label class="small muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="remove_avatar"> Remove current photo</label>{% endif %}
+        <p class="field-help">JPEG, PNG or WebP, up to 5 MB.</p>
+      </div>
+    </div>
+    {% for error in form.avatar.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.full_name %}
+    {% include "partials/field.html" with field=form.username %}
+  </div>
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.level %}
+    {% include "partials/field.html" with field=form.matric_number optional=True %}
+  </div>
+  <div class="field{% if form.bio.errors %} has-error{% endif %}">
+    <label for="{{ form.bio.id_for_label }}">Bio <span class="optional">(optional)</span></label>
+    <textarea name="bio" id="{{ form.bio.id_for_label }}" rows="3" maxlength="280" data-count="bio-count">{{ form.bio.value|default:"" }}</textarea>
+    <p class="field-help" id="bio-count" aria-live="polite"></p>
+    {% for error in form.bio.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+  {% include "partials/field.html" with field=form.skills optional=True %}
+  <h2 class="section-title">Links</h2>
+  {% include "partials/field.html" with field=form.github_url optional=True %}
+  {% include "partials/field.html" with field=form.linkedin_url optional=True %}
+  {% include "partials/field.html" with field=form.portfolio_url optional=True %}
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{% url 'accounts:profile' user.username %}">View profile</a>
+    <button type="submit" class="btn btn-primary">Save profile</button>
+  </div>
+</form>
+{% endblock %}

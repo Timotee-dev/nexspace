@@ -1,0 +1,66 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Moderation{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Moderation</h1><p>Open reports in your department, most-reported first.</p></div>
+  <a class="btn btn-ghost" href="{% url 'moderation:log' %}">Moderation log</a>
+</div>
+<ul class="mod-list">
+  {% for item in items %}
+  <li class="panel mod-item">
+    <p class="small muted"><span class="tag">{{ item.target_type|title }}</span> {{ item.count }} report{{ item.count|pluralize }}{% if item.obj.is_hidden %} · <b>Auto-hidden</b>{% endif %}</p>
+    <div class="mod-preview">
+      {% if item.target_type == "post" %}
+        {% if item.obj.title %}<b>{{ item.obj.title }}</b>{% endif %}<div class="post-body">{{ item.obj.body|truncatechars:400|render_body }}</div>
+        <a class="small" href="{{ item.obj.get_absolute_url }}">Open post</a>
+      {% elif item.target_type == "comment" %}
+        <div class="post-body">{{ item.obj.body|truncatechars:400|render_body }}</div><a class="small" href="{{ item.obj.post.get_absolute_url }}#c-{{ item.obj.pk }}">Open in context</a>
+      {% elif item.target_type == "resource" %}
+        <b>{{ item.obj.title }}</b> <a class="small" href="{{ item.obj.get_absolute_url }}">Open resource</a>
+      {% elif item.target_type == "user" %}
+        <a href="{% url 'accounts:profile' item.obj.username %}"><b>{{ item.obj.full_name }}</b> @{{ item.obj.username }}</a>
+      {% else %}
+        <b>{{ item.obj.name }}</b> <a class="small" href="{{ item.obj.get_absolute_url }}">Open Space</a>
+      {% endif %}
+    </div>
+    <p class="small">By: {% if item.target_type == "post" and item.obj.is_anonymous %}Anonymous Student{% elif item.owner %}{{ item.owner.full_name }} (@{{ item.owner.username }}){% else %}—{% endif %}</p>
+    <ul class="small report-reasons">{% for r in item.reports %}<li><b>{{ r.get_reason_display }}</b>{% if r.details %}: {{ r.details }}{% endif %} <span class="muted">· {{ r.created_at|ago }}</span></li>{% endfor %}</ul>
+    <form method="post" action="{% url 'moderation:action' %}" class="mod-actions">
+      {% csrf_token %}
+      <input type="hidden" name="target_type" value="{{ item.target_type }}"><input type="hidden" name="target_id" value="{{ item.obj.pk }}">
+      {% if item.owner %}<input type="hidden" name="user_id" value="{{ item.owner.pk }}">{% endif %}
+      <label class="visually-hidden" for="note-{{ forloop.counter }}">Note for the log</label>
+      <input id="note-{{ forloop.counter }}" name="note" maxlength="500" placeholder="Note for the log (optional)">
+      <div class="mod-buttons">
+        <button type="submit" name="action" value="dismiss" class="btn btn-ghost btn-sm">Dismiss</button>
+        {% if item.target_type != "user" %}<button type="submit" name="action" value="remove" class="btn btn-danger btn-sm" data-confirm-click="Remove this for everyone?">Remove</button>{% endif %}
+        {% if item.owner and item.owner.pk != user.pk and not item.owner.is_superuser %}
+          {% if not item.target_type == "post" or not item.obj.is_anonymous %}
+          <button type="submit" name="action" value="suspend" class="btn btn-ghost btn-sm">Suspend 7 days</button>
+          {% if is_admin %}<button type="submit" name="action" value="ban" class="btn btn-danger btn-sm" data-confirm-click="Ban this account? They won't be able to log in.">Ban</button>{% endif %}
+          {% endif %}
+        {% endif %}
+      </div>
+      <input type="hidden" name="days" value="7">
+    </form>
+    {% if item.target_type == "post" and item.obj.is_anonymous %}
+    <form method="post" action="{% url 'moderation:reveal' item.obj.pk %}" data-confirm="Reveal who wrote this anonymous post? This is logged.">{% csrf_token %}<button type="submit" class="btn btn-quiet btn-sm">Reveal author (logged)</button></form>
+    {% endif %}
+  </li>
+  {% empty %}
+  <li class="empty"><h2>No open reports</h2><p>You're all caught up. Reports from students show up here.</p></li>
+  {% endfor %}
+</ul>
+
+{% if suspended %}
+<section style="margin-top:32px"><h2 class="section-title">Suspensions</h2>
+  <ul class="member-list">
+    {% for u in suspended %}{% if u.is_suspended %}
+    <li class="suggest-list-row"><span><b>{{ u.full_name }}</b> <span class="small muted">until {{ u.suspended_until|date:"j M, H:i" }}</span></span>
+      <form method="post" action="{% url 'moderation:action' %}">{% csrf_token %}<input type="hidden" name="user_id" value="{{ u.pk }}"><button type="submit" name="action" value="unsuspend" class="btn btn-ghost btn-sm">Lift</button></form></li>
+    {% endif %}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

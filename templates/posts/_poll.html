@@ -1,0 +1,29 @@
+{% load nexspace %}
+{% with poll=post.poll %}
+<div class="poll">
+  {% if post.has_voted_poll or poll.is_closed or post.author_id == user.pk %}
+    {% with total=poll.total_votes %}
+    <ul class="poll-results">
+      {% for option in poll.options.all %}
+      <li><span class="poll-bar" style="width:{{ option.vote_count|percent:total }}%"></span><span class="poll-text">{{ option.text }}</span><b>{{ option.vote_count|percent:total }}%</b></li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">{{ total }} vote{{ total|pluralize }}{% if poll.is_closed %} · Final results{% elif poll.closes_at %} · Closes {{ poll.closes_at|date:"j M, H:i" }}{% endif %}{% if poll.allows_multiple %} · Multiple choice{% endif %}</p>
+    {% endwith %}
+  {% else %}
+  <form method="post" action="{% url 'posts:poll-vote' post.pk %}" class="poll-form">
+    {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}#post-{{ post.pk }}">
+    <fieldset>
+      <legend class="visually-hidden">Poll options</legend>
+      {% for option in poll.options.all %}
+      <label class="choice"><input type="{% if poll.allows_multiple %}checkbox{% else %}radio{% endif %}" name="option" value="{{ option.pk }}"{% if not poll.allows_multiple %} required{% endif %}><span class="choice-text">{{ option.text }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <div class="poll-foot">
+      <span class="muted small">{% if poll.allows_multiple %}Pick any{% else %}Pick one{% endif %}{% if poll.closes_at %} · Closes {{ poll.closes_at|date:"j M, H:i" }}{% endif %} · Votes are final</span>
+      <button type="submit" class="btn btn-ghost btn-sm">Vote</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endwith %}

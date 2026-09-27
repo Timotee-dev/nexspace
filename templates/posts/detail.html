@@ -1,0 +1,25 @@
+{% extends "layouts/app.html" %}
+{% block title %}{% if post.title %}{{ post.title }}{% else %}{{ post.get_kind_display }} by {{ post.display_name }}{% endif %}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'core:home' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Back</a></div>
+{% include "posts/_post_card.html" with detail=True %}
+
+<section class="comments" id="comments" aria-labelledby="comments-title">
+  <h2 id="comments-title" class="comments-title">{% if post.kind == "question" %}Answers{% else %}Comments{% endif %} <span class="muted">{{ post.comment_count }}</span></h2>
+  {% if user.can_write %}
+  <form method="post" action="{% url 'posts:comment' post.pk %}" class="comment-form">
+    {% csrf_token %}
+    <label for="comment-body" class="visually-hidden">{% if post.kind == "question" %}Your answer{% else %}Your comment{% endif %}</label>
+    <textarea id="comment-body" name="body" rows="2" maxlength="1000" required placeholder="{% if post.kind == 'question' %}Write an answer…{% else %}Add a comment…{% endif %}"></textarea>
+    <div class="comment-form-foot"><span class="muted small">Mention people with @username</span><button type="submit" class="btn btn-primary btn-sm">{% if post.kind == "question" %}Post answer{% else %}Comment{% endif %}</button></div>
+  </form>
+  {% endif %}
+  {% if thread %}
+  <ol class="thread">
+    {% for comment in thread %}{% include "posts/_comment.html" %}{% endfor %}
+  </ol>
+  {% else %}
+  <div class="empty empty-sm"><p>{% if post.kind == "question" %}No answers yet. Know the answer? Help out.{% else %}No comments yet. Start the conversation.{% endif %}</p></div>
+  {% endif %}
+</section>
+{% endblock %}

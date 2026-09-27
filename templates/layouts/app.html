@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% load static %}
+{% block body %}
+{% with path=request.path %}
+<div class="shell {% block shell_class %}{% endblock %}">
+  <header class="topbar mobile-only">
+    <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
+    <div class="topbar-actions">
+      <a class="icon-btn" href="{% url 'search:search' %}" aria-label="Search"><svg class="icon"><use href="#i-search"/></svg></a>
+      <a class="icon-btn" href="{% url 'notifications:list' %}" aria-label="Notifications"><span class="icon-wrap"><svg class="icon"><use href="#i-bell"/></svg><span class="badge" data-unread{% if not unread_notifications %} hidden{% endif %}>{% if unread_notifications > 99 %}99+{% else %}{{ unread_notifications }}{% endif %}</span></span></a>
+      {% if is_moderator %}<a class="icon-btn" href="{% url 'moderation:queue' %}" aria-label="Moderation"><svg class="icon"><use href="#i-shield"/></svg></a>{% endif %}
+      <a class="icon-btn" href="{% url 'accounts:settings-profile' %}" aria-label="Settings"><svg class="icon"><use href="#i-settings"/></svg></a>
+    </div>
+  </header>
+
+  <nav class="sidebar" aria-label="Main">
+    <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
+    <ul class="nav">
+      {% include "partials/nav_items.html" %}
+      <li><button type="button" data-theme-toggle aria-label="Change theme"><svg class="icon"><use href="#i-theme"/></svg><span class="nav-label">Theme</span></button></li>
+    </ul>
+    <a class="btn btn-primary sidebar-post" href="{% url 'posts:compose' %}" aria-label="Create a post"><svg class="icon-sm"><use href="#i-plus"/></svg><span class="nav-label">Post</span></a>
+    <div class="sidebar-spacer"></div>
+    <a class="sidebar-user" href="{% url 'accounts:profile' user.username %}">
+      {% include "partials/avatar.html" with person=user %}
+      <span class="sidebar-user-text"><b>{{ user.full_name }}</b><span>@{{ user.username }}</span></span>
+    </a>
+    <form method="post" action="{% url 'accounts:logout' %}">
+      {% csrf_token %}
+      <ul class="nav"><li><button type="submit" aria-label="Log out"><svg class="icon"><use href="#i-logout"/></svg><span class="nav-label">Log out</span></button></li></ul>
+    </form>
+  </nav>
+
+  <main class="main" id="main">
+    {% if not user.email_verified %}{% include "partials/verify_banner.html" %}{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <aside class="rightbar" aria-label="Context">
+    {% block rightbar %}{% include "partials/department_card.html" %}{% endblock %}
+  </aside>
+
+  <nav class="bottomnav mobile-only" aria-label="Main">
+    {% url 'core:home' as home_url %}{% url 'discover:explore' as explore_url %}{% url 'posts:compose' as compose_url %}{% url 'spaces:list' as spaces_url %}{% url 'accounts:profile' user.username as profile_url %}
+    <a href="{{ home_url }}" {% if path == home_url %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg>Home</a>
+    <a href="{{ explore_url }}" {% if explore_url in path or "/opportunities/" in path or "/groups/" in path or "/resources/" in path or "/calendar/" in path or "/announcements/" in path %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-compass"/></svg>Explore</a>
+    <a href="{{ compose_url }}" class="bottomnav-create" {% if path == compose_url %}aria-current="page"{% endif %} aria-label="Create"><span><svg class="icon"><use href="#i-plus"/></svg></span></a>
+    <a href="{{ spaces_url }}" {% if spaces_url in path or "/s/" in path or "/courses/" in path %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-layers"/></svg>Spaces</a>
+    <a href="{{ profile_url }}" {% if path == profile_url %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg>Profile</a>
+  </nav>
+</div>
+{% endwith %}
+{% endblock %}
+{% block scripts %}<script type="module" src="{% static 'js/feed.js' %}"></script>{% block page_scripts %}{% endblock %}{% endblock %}

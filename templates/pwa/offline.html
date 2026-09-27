@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}You're offline{% endblock %}
+{% block body %}
+<main class="error-page" id="main"><div>
+  <p class="code" aria-hidden="true">⌁</p>
+  <h1>You're offline</h1>
+  <p>NexSpace needs a connection for most things. While offline you can still open the home feed you last loaded. Posting, voting, downloads and notifications need you to reconnect.</p>
+  <a class="btn btn-primary" href="/">Try again</a>
+</div></main>
+{% endblock %}

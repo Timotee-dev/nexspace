@@ -1,0 +1,119 @@
+{% extends "layouts/app.html" %}
+{% block title %}New post{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Create</h1><p>Share with your department.</p></div>
+
+{% if not user.can_write %}
+<section class="empty">
+  <svg class="icon"><use href="#i-mail"/></svg>
+  {% if user.is_suspended %}
+  <h2>Your account is suspended</h2>
+  <p>You can read NexSpace until {{ user.suspended_until|date:"j M Y, H:i" }}, but you can't post, comment or vote.</p>
+  {% else %}
+  <h2>Verify your email to post</h2>
+  <p>We sent a link to {{ user.email }}. Once you verify, you can post, comment and vote.</p>
+  {% endif %}
+</section>
+{% else %}
+<form method="post" enctype="multipart/form-data" class="form composer" novalidate data-composer>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+  <fieldset class="kind-picker">
+    <legend class="visually-hidden">What are you posting?</legend>
+    {% for radio in form.kind %}
+    <label class="kind-option">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+    {% endfor %}
+  </fieldset>
+
+  {% if form.fields.space.queryset.exists %}{% include "partials/field.html" with field=form.space %}{% endif %}
+
+  <div class="kind-only kind-event kind-opportunity">
+    {% include "partials/field.html" with field=form.title %}
+  </div>
+
+  <div class="field{% if form.body.errors %} has-error{% endif %}">
+    <label for="id_body">
+      <span class="kind-label kind-label-post">What's happening?</span>
+      <span class="kind-label kind-label-question">Your question</span>
+      <span class="kind-label kind-label-poll">Poll question</span>
+      <span class="kind-label kind-label-event">Details <span class="optional">(optional)</span></span>
+      <span class="kind-label kind-label-opportunity">Description <span class="optional">(optional)</span></span>
+    </label>
+    <textarea name="body" id="id_body" rows="5" maxlength="2000" data-count="body-count" placeholder="Mention people with @username">{{ form.body.value|default:"" }}</textarea>
+    <p class="field-help" id="body-count" aria-live="polite"></p>
+    {% for error in form.body.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+
+  <div class="kind-only kind-poll stack">
+    <div class="field">
+      <span class="field-label">Options <span class="optional">(2 to 6)</span></span>
+      <div class="poll-options" data-poll-options>
+        {% for option in poll_options %}
+        <input type="text" name="poll_option" maxlength="80" value="{{ option }}" aria-label="Option {{ forloop.counter }}" placeholder="Option {{ forloop.counter }}">
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-quiet btn-sm" data-add-option>Add option</button>
+      <noscript><p class="field-help">Without JavaScript, fill both options now; you can add more after enabling it.</p></noscript>
+    </div>
+    <label class="toggle-row" for="id_poll_multiple"><span>{{ form.poll_multiple.label }}</span><span class="switch">{{ form.poll_multiple }}<span></span></span></label>
+    {% include "partials/field.html" with field=form.poll_closes_at %}
+  </div>
+
+  <div class="kind-only kind-event">
+    <div class="form-row two">
+      {% include "partials/field.html" with field=form.event_starts_at %}
+      {% include "partials/field.html" with field=form.event_ends_at %}
+    </div>
+    {% include "partials/field.html" with field=form.event_location %}
+  </div>
+
+  <div class="kind-only kind-opportunity stack">
+    <div class="form-row two">
+      {% include "partials/field.html" with field=form.opp_organization %}
+      {% include "partials/field.html" with field=form.opp_category %}
+    </div>
+    <div class="form-row two">
+      {% include "partials/field.html" with field=form.opp_deadline %}
+      {% include "partials/field.html" with field=form.opp_location %}
+    </div>
+    {% include "partials/field.html" with field=form.opp_apply_url %}
+  </div>
+
+  <div class="attach-row">
+    <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-image"/></svg>Images<input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-attach="images" aria-label="Add images (up to 4)"></label>
+    <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-file"/></svg>Files<input type="file" name="files" accept=".pdf,.doc,.docx,.ppt,.pptx" multiple data-attach="files" aria-label="Add PDF, Word or PowerPoint files (up to 3)"></label>
+    <span class="muted small">Up to 4 images (5 MB each) and 3 files (20 MB each)</span>
+  </div>
+  <ul class="attach-preview" data-attach-preview aria-live="polite"></ul>
+
+  <fieldset class="field">
+    <legend>Topics <span class="optional">(up to 3)</span></legend>
+    <ul class="chips" data-max-topics="3">
+      {% for choice in form.topics %}<li class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></li>{% endfor %}
+    </ul>
+    {% for error in form.topics.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+
+  <div class="kind-only kind-post kind-question">
+    <label class="toggle-row" for="id_is_anonymous">
+      <span class="choice-text"><span>{{ form.is_anonymous.label }}</span><small>Other students see "Anonymous Student". Moderators can still see who posted, to keep NexSpace safe.</small></span>
+      <span class="switch">{{ form.is_anonymous }}<span></span></span>
+    </label>
+  </div>
+  {% if form.is_official %}
+  <label class="toggle-row" for="id_is_official">
+    <span class="choice-text"><span>{{ form.is_official.label }}</span><small>Shows in everyone's Department tab with an Official badge.</small></span>
+    <span class="switch">{{ form.is_official }}<span></span></span>
+  </label>
+  {% endif %}
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{% url 'core:home' %}">Cancel</a>
+    <button type="submit" class="btn btn-primary">Post</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block page_scripts %}{% load static %}<script type="module" src="{% static 'js/composer.js' %}"></script>{% endblock %}

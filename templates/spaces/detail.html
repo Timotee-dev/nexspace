@@ -1,0 +1,100 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}{% if course %}{{ course.code }}{% else %}{{ space.name }}{% endif %}{% endblock %}
+{% block content %}
+<header class="space-header">
+  <span class="space-glyph space-glyph-lg" aria-hidden="true">{% if course %}{{ course.code|slice:":3" }}{% else %}{{ space.glyph }}{% endif %}</span>
+  <div class="space-header-text">
+    {% if course %}
+    <h1>{{ course.code }} <span class="muted">·</span> {{ course.title }}</h1>
+    <p class="small muted">{{ course.get_level_display }} · {{ course.get_semester_display }} · {{ course.units }} unit{{ course.units|pluralize }}{% if course.lecturer %} · {{ course.lecturer }}{% endif %}</p>
+    {% if reps %}<p class="small">Course rep: {% for rep in reps %}<a href="{% url 'accounts:profile' rep.username %}">{{ rep.full_name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    {% else %}
+    <h1>{{ space.name }}{% if space.is_official %} <span class="tag tag-official">Official</span>{% endif %}</h1>
+    {% if space.description %}<p class="muted">{{ space.description }}</p>{% endif %}
+    {% endif %}
+    <p class="small muted">{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted in your feeds{% endif %}</p>
+  </div>
+  <div class="space-header-actions">
+    {% include "partials/space_membership.html" %}
+    {% if membership %}
+    <form method="post" action="{% url 'spaces:membership' space.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" name="action" value="{% if membership.is_muted %}unmute{% else %}mute{% endif %}" class="btn btn-quiet">{% if membership.is_muted %}Unmute{% else %}Mute{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+
+<nav class="tabs" aria-label="{{ space.name }} sections">
+  {% for key, label in tabs %}<a href="?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+
+{% if tab == "posts" or tab == "discussions" or tab == "questions" %}
+  {% if course %}<a class="nexai-launch" href="{% url 'nexai:ask' %}?course={{ course.slug }}"><span class="nexai-mark" aria-hidden="true">✦</span><span>Ask NexAI about {{ course.code }}</span></a>{% endif %}
+  <div class="space-toolbar">
+    <form method="get" class="search-inline" role="search">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <label for="space-q" class="visually-hidden">Search this Space</label>
+      <input id="space-q" type="search" name="q" value="{{ q }}" placeholder="Search {% if course %}{{ course.code }}{% else %}this Space{% endif %}">
+    </form>
+    {% if membership and user.can_write %}<a class="btn btn-primary btn-sm" href="{% url 'posts:compose' %}?space={{ space.slug }}{% if tab == 'questions' %}&type=question{% endif %}">{% if tab == "questions" %}Ask{% else %}Post{% endif %}</a>{% endif %}
+  </div>
+  <div class="feed">
+    {% for post in posts %}{% include "posts/_post_card.html" with hide_space=True %}{% empty %}
+    <section class="empty"><h2>{% if q %}Nothing matches "{{ q }}"{% elif tab == "questions" %}No questions yet{% else %}Nothing here yet{% endif %}</h2>
+      <p>{% if membership %}Be the first person to start the conversation.{% else %}Join to post here.{% endif %}</p></section>
+    {% endfor %}
+  </div>
+
+{% elif tab == "resources" or tab == "past-questions" %}
+  <div class="space-toolbar">
+    <form method="get" class="search-inline" role="search">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <label for="res-q" class="visually-hidden">Search materials</label>
+      <input id="res-q" type="search" name="q" value="{{ q }}" placeholder="e.g. sorting, 2023">
+      <label for="res-sort" class="visually-hidden">Sort</label>
+      <select id="res-sort" name="sort" onchange="this.form.submit()">
+        <option value="useful" {% if sort == "useful" %}selected{% endif %}>Most useful</option>
+        <option value="downloads" {% if sort == "downloads" %}selected{% endif %}>Most downloaded</option>
+        <option value="recent" {% if sort == "recent" %}selected{% endif %}>Most recent</option>
+        <option value="rated" {% if sort == "rated" %}selected{% endif %}>Highest rated</option>
+      </select>
+    </form>
+    {% if tab == "past-questions" and resources and nexai_enabled %}
+    <form method="post" action="{% url 'nexai:insights' course.slug %}">{% csrf_token %}<button class="btn btn-ghost btn-sm"><span aria-hidden="true">✦</span> What comes up most?</button></form>
+    {% endif %}
+    {% if user.can_write %}<a class="btn btn-primary btn-sm" href="{% url 'resources:upload' %}?course={{ course.slug }}{% if tab == 'past-questions' %}&type=past_question{% endif %}">Upload</a>{% endif %}
+  </div>
+  {% if resources %}
+  <ul class="resource-list">{% for resource in resources %}{% include "partials/resource_row.html" %}{% endfor %}</ul>
+  {% else %}
+  <div class="empty"><h2>{% if tab == "past-questions" %}No past questions yet{% else %}No resources have been uploaded yet{% endif %}</h2>
+    <p>{% if is_rep %}As course rep, your uploads publish immediately with a Course rep badge.{% else %}Have notes or past questions? Share them with your classmates.{% endif %}</p></div>
+  {% endif %}
+
+{% elif tab == "members" or tab == "people" %}
+  <ul class="member-list">
+    {% for m in members %}
+    <li><a href="{% url 'accounts:profile' m.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=m.user %}<span><b>{{ m.user.full_name }}</b><span class="small muted">{{ m.user.level_label }}{% if m.role == "moderator" %} · Moderator{% endif %}</span></span></a></li>
+    {% empty %}<li class="empty empty-sm"><p>No members yet.</p></li>
+    {% endfor %}
+  </ul>
+
+{% elif tab == "upcoming" %}
+  <div class="space-toolbar"><span></span>{% if is_rep %}<a class="btn btn-primary btn-sm" href="{% url 'notices:event-create' %}">Add date</a>{% endif %}</div>
+  <ul class="event-list">
+    {% for event in events %}{% include "notices/_event.html" %}{% empty %}
+    <li class="empty"><h2>Nothing scheduled</h2><p>Tests, assignments and exams for {{ course.code }} will show here.</p></li>
+    {% endfor %}
+  </ul>
+
+{% else %}
+  <section class="panel stack">
+    {% if space.description %}<p>{{ space.description }}</p>{% endif %}
+    {% if course.description %}<p>{{ course.description }}</p>{% endif %}
+    <div><h2 class="section-title">Rules</h2>{% if space.rules %}<div class="post-body">{{ space.rules|render_body }}</div>{% else %}<p class="muted">Be respectful, stay on topic and follow NexSpace's community guidelines.</p>{% endif %}</div>
+    <p class="small muted">Created {{ space.created_at|date:"F Y" }}</p>
+    {% if not space.course and user.pk != space.created_by_id %}<a class="small" href="{% url 'moderation:report' 'space' space.pk %}?next={{ request.get_full_path|urlencode }}">Report this Space</a>{% endif %}
+  </section>
+{% endif %}
+{% endblock %}

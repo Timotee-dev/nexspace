@@ -1,0 +1,7 @@
+<li class="group-card">
+  <a href="{{ g.get_absolute_url }}">
+    <b>{{ g.name }}</b>
+    <span class="small muted">{% if g.course %}{{ g.course.code }} · {% endif %}{{ g.member_count }} member{{ g.member_count|pluralize }}{% if not g.is_open %} · Invite-only{% endif %}</span>
+    {% if g.next_meeting_at %}<span class="small">Next: {{ g.next_meeting_at|date:"D j M, H:i" }}</span>{% endif %}
+  </a>
+</li>

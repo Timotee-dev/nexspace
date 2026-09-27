@@ -1,0 +1,74 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Set up your space{% endblock %}
+{% block card_class %} wide{% endblock %}
+{% block card %}
+<div class="stack" style="gap:8px">
+  <div class="progress" aria-hidden="true">{% for i in "123" %}<span class="{% if forloop.counter <= step_number %}on{% endif %}"></span>{% endfor %}</div>
+  <p class="step-count">Step {{ step_number }} of {{ step_total }}</p>
+</div>
+{% if step == "interests" %}
+<header>
+  <h1>Welcome to NexSpace, {{ user.get_short_name }}</h1>
+  <p>What are you interested in? Pick as many as you like — this shapes what you see first.</p>
+</header>
+<form method="post" class="form">
+  {% csrf_token %}
+  <fieldset style="border:0;margin:0;padding:0">
+    <legend class="visually-hidden">Interests</legend>
+    <ul class="chips">
+      {% for choice in form.interests %}
+      <li class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></li>
+      {% endfor %}
+    </ul>
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Continue</button>
+  </div>
+</form>
+{% elif step == "spaces" %}
+<header>
+  <h1>Choose Spaces to join</h1>
+  <p>Spaces are where discussions happen. We've picked your department, your level and your courses — change anything you like.</p>
+</header>
+<form method="post" class="form">
+  {% csrf_token %}
+  <fieldset style="border:0;margin:0;padding:0">
+    <legend class="visually-hidden">Spaces</legend>
+    <ul class="space-picks">
+      {% for space in suggested %}
+      <li><label class="choice"><input type="checkbox" name="spaces" value="{{ space.pk }}"{% if space.preselected %} checked{% endif %}>
+        <span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span>
+        <span class="choice-text"><span>{{ space.name }}{% if space.is_official %} <span class="tag tag-official">Official</span>{% endif %}</span>{% if space.description %}<small>{{ space.description }}</small>{% endif %}</span></label></li>
+      {% empty %}
+      <li class="muted">No Spaces have been set up for your department yet. You can join them later.</li>
+      {% endfor %}
+    </ul>
+  </fieldset>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="?step=level">Back</a>
+    <button type="submit" class="btn btn-primary">Finish setup</button>
+  </div>
+</form>
+{% else %}
+<header>
+  <h1>What level are you in?</h1>
+  <p>We'll use this to show you the right courses, exams and announcements.</p>
+</header>
+<form method="post" class="form">
+  {% csrf_token %}
+  <fieldset class="field" style="border:0;margin:0;padding:0">
+    <legend class="visually-hidden">Level</legend>
+    <div class="form-row two">
+      {% for radio in form.level %}
+      <label class="choice">{{ radio.tag }}<span class="choice-text">{{ radio.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    {% for error in form.level.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="?step=interests">Back</a>
+    <button type="submit" class="btn btn-primary">Continue</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

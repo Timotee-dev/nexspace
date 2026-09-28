@@ -77,7 +77,9 @@ def _name(user, anonymous=False):
 def post_created(post):
     url = post.get_absolute_url()
     who = _name(post.author, post.is_anonymous)
-    mentioned = list(post.mentions.all())
+    from apps.posts.services import can_view
+
+    mentioned = [u for u in post.mentions.all() if can_view(u, post)]  # no pings into private Spaces
     notify(mentioned, category=Category.SOCIAL, kind=Notification.Kind.MENTION, text=f"{who} mentioned you in a post",
            url=url, actor=None if post.is_anonymous else post.author)
     if post.kind == "opportunity":
@@ -111,7 +113,9 @@ def comment_created(comment):
             continue
         notified.add(user.pk)
         notify([user], category=Category.SOCIAL, kind=Notification.Kind.REPLY, text=text, url=url, actor=comment.author)
-    mentioned = [u for u in comment.mentions.all() if u.pk not in notified]
+    from apps.posts.services import can_view
+
+    mentioned = [u for u in comment.mentions.all() if u.pk not in notified and can_view(u, post)]
     notify(mentioned, category=Category.SOCIAL, kind=Notification.Kind.MENTION,
            text=f"{who} mentioned you in a comment", url=url, actor=comment.author)
 
@@ -151,6 +155,30 @@ def resource_uploaded(resource):
            text=f"New {'past question' if is_pq else resource.get_resource_type_display().lower()} in "
                 f"{resource.course.code}: {resource.title}",
            url=resource.get_absolute_url(), actor=resource.uploaded_by)
+
+
+@safely
+def join_requested(space, user):
+    from apps.accounts.models import RoleAssignment, User
+    from apps.spaces.models import SpaceMembership
+
+    managers = {m.user for m in SpaceMembership.objects.filter(space=space, role="moderator").select_related("user")}
+    if not managers:  # fall back to the department admins
+        managers = set(User.objects.filter(role_assignments__role=RoleAssignment.Role.DEPARTMENT_ADMIN,
+                                           role_assignments__department=space.department, is_active=True))
+    notify(list(managers), category=Category.SOCIAL, kind=Notification.Kind.SPACE_REQUEST,
+           text=f"{user.full_name} asked to join {space.name}", url=f"{space.get_absolute_url()}?tab=requests",
+           actor=user, dedupe_key=f"space-request:{space.pk}:{user.pk}:{timezone.now():%Y%m%d%H}")
+
+
+@safely
+def join_decided(join_request):
+    space = join_request.space
+    approved = join_request.status == "approved"
+    notify([join_request.user], category=Category.SOCIAL, kind=Notification.Kind.SPACE_REQUEST,
+           text=f"You're in! Your request to join {space.name} was approved" if approved
+           else f"Your request to join {space.name} wasn't approved",
+           url=space.get_absolute_url() if approved else "/spaces/", actor=join_request.decided_by)
 
 
 def audience_users(item):

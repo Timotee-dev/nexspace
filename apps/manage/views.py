@@ -267,7 +267,7 @@ def session_current_view(request, pk):
 class SpaceForm(forms.ModelForm):
     class Meta:
         model = Space
-        fields = ["name", "icon", "kind", "level", "description", "rules", "is_official"]
+        fields = ["name", "icon", "kind", "level", "description", "rules", "is_official", "requires_approval"]
         widgets = {"rules": forms.Textarea(attrs={"rows": 4})}
 
     def __init__(self, *args, **kwargs):

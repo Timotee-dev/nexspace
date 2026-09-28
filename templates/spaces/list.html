@@ -2,8 +2,8 @@
 {% block title %}Spaces{% endblock %}
 {% block content %}
 <div class="page-head topic-head">
-  <div><h1>Spaces</h1><p>Communities in your department.</p></div>
-  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'spaces:create' %}">New Space</a>{% endif %}
+  <div><h1>Spaces</h1><p>Communities in your department. Spaces marked 🔒 need approval to join.</p></div>
+  {% if can_create and user.can_write %}<a class="btn btn-primary" href="{% url 'spaces:create' %}">New Space</a>{% endif %}
 </div>
 <nav class="settings-nav" aria-label="Browse">
   <a href="{% url 'spaces:list' %}" aria-current="page">Spaces</a>
@@ -25,7 +25,7 @@
   {% if discover %}
   <ul class="space-grid">{% for space in discover %}{% include "spaces/_card.html" with membership=None %}{% endfor %}</ul>
   {% else %}
-  <div class="empty empty-sm"><p>You've joined every Space in your department. Start a new one for a club, project or study topic.</p></div>
+  <div class="empty empty-sm"><p>You've joined every Space in your department.{% if can_create %} Start a new one for a club, project or study topic.{% endif %}</p></div>
   {% endif %}
 </section>
 {% endblock %}

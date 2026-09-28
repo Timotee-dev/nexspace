@@ -28,7 +28,7 @@
 {% elif step == "spaces" %}
 <header>
   <h1>Choose Spaces to join</h1>
-  <p>Spaces are where discussions happen. We've picked your department, your level and your courses — change anything you like.</p>
+  <p>Spaces are where discussions happen. We've picked your department, your level and your courses — change anything you like. Spaces marked 🔒 need approval; we'll send a request for you.</p>
 </header>
 <form method="post" class="form">
   {% csrf_token %}
@@ -38,7 +38,7 @@
       {% for space in suggested %}
       <li><label class="choice"><input type="checkbox" name="spaces" value="{{ space.pk }}"{% if space.preselected %} checked{% endif %}>
         <span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span>
-        <span class="choice-text"><span>{{ space.name }}{% if space.is_official %} <span class="tag tag-official">Official</span>{% endif %}</span>{% if space.description %}<small>{{ space.description }}</small>{% endif %}</span></label></li>
+        <span class="choice-text"><span>{% if space.requires_approval %}🔒 {% endif %}{{ space.name }}{% if space.is_official %} <span class="tag tag-official">Official</span>{% endif %}</span>{% if space.description %}<small>{{ space.description }}</small>{% endif %}</span></label></li>
       {% empty %}
       <li class="muted">No Spaces have been set up for your department yet. You can join them later.</li>
       {% endfor %}

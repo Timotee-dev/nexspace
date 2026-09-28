@@ -103,13 +103,15 @@ def test_other_department_cannot_join(make_user, other_department, course):
         spaces.join(outsider, course.space)
 
 
-def test_create_community_space(client, student, make_user):
-    space = spaces.create_space(user=student, name="Robotics Club", icon="🤖")
-    assert space.slug == "robotics-club" and space.member_count == 1
-    assert SpaceMembership.objects.get(space=space, user=student).role == "moderator"
+def test_only_reps_and_above_create_spaces(client, student, rep, make_user):
     with pytest.raises(PermissionDenied):
-        spaces.create_space(user=make_user(email="u@example.com", verified=False), name="Nope")
+        spaces.create_space(user=student, name="Robotics Club")
     client.force_login(student)
+    assert client.get(reverse("spaces:create")).status_code == 403
+    space = spaces.create_space(user=rep, name="Robotics Club", icon="🤖")
+    assert space.slug == "robotics-club" and space.member_count == 1 and space.requires_approval
+    assert SpaceMembership.objects.get(space=space, user=rep).role == "moderator"
+    client.force_login(rep)
     assert client.get(reverse("spaces:detail", args=[space.slug])).status_code == 200
 
 

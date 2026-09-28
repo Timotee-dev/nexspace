@@ -52,6 +52,11 @@ def _limit(user, action, rate):
 def can_view(user, post) -> bool:
     if post.is_deleted or user.department_id is None or post.department_id != user.department_id:
         return False
+    if post.space_id and post.space.requires_approval:
+        from apps.spaces.services import can_see_inside
+
+        if not can_see_inside(user, post.space):
+            return False
     return not post.is_hidden or post.author_id == user.pk or user.can_moderate(post.department)
 
 

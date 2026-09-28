@@ -264,7 +264,8 @@ class Command(BaseCommand):
                                  ("Programming", "⌨️", "Code, bugs and side projects."),
                                  ("AI & Machine Learning", "🤖", "Models, papers and experiments."),
                                  ("Internships & SIWES", "💼", "Placements, applications and advice.")):
-            spaces.create_space(user=users["mod"], name=name, description=desc, icon=icon)
+            spaces.create_space(user=users["mod"], name=name, description=desc, icon=icon,
+                                requires_approval=name != "General Discussion")
 
         csc301 = Course.objects.get(department=dept, code="CSC 301")
         rep = users["rep"]
@@ -273,11 +274,12 @@ class Command(BaseCommand):
             u = users[key]
             for space in Space.objects.filter(department=dept).filter(level__in=[u.level]) | Space.objects.filter(
                     department=dept, kind__in=["department", "community"]):
-                spaces.join(u, space)
+                spaces.add_member(space, u)
         for space in Space.objects.filter(department=dept, level=100) | Space.objects.filter(department=dept, kind="department"):
-            spaces.join(users["fresher"], space)
+            spaces.add_member(space, users["fresher"])
 
         prog = Space.objects.get(department=dept, slug="programming")
+        spaces.request_to_join(users["fresher"], prog, "I'm learning Python and want to follow along")
         cache.clear()
         posts.create_post(author=users["student"], kind="question", space=csc301.space,
                           body="For the CSC 301 test: will linked lists and trees both be covered, or only up to stacks and queues?")

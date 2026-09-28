@@ -193,7 +193,11 @@ def test_report_resource_user_and_space(make_user, author, department):
     from apps.resources import services as resources
     from apps.spaces import services as spaces
 
+    from apps.accounts.models import RoleAssignment
+    from apps.accounts.services import assign_role
+
     course = Course.objects.create(department=department, code="CSC 999", title="T", level=300, semester=1)
+    assign_role(user=author, role=RoleAssignment.Role.COURSE_REP, course=course)
     res = resources.upload(user=author, course=course, title="R", resource_type="other",
                            file=SimpleUploadedFile("r.pdf", b"%PDF-1.4"))
     space = spaces.create_space(user=author, name="Some Space")

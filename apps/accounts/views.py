@@ -3,6 +3,7 @@ from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -133,15 +134,24 @@ def onboarding_view(request):
             .select_related("course").order_by("kind", "name")[:40]
         )
         joined = space_services.joined_space_ids(user)
-        preselect = {s.pk for s in suggested if s.pk in joined or s.kind in ("department", "level")
-                     or (s.kind == "course" and s.level == user.level)}
+        pending = space_services.pending_request_ids(user)
+        preselect = {s.pk for s in suggested if s.pk in joined or s.pk in pending
+                     or s.kind in ("department", "level") or (s.kind == "course" and s.level == user.level)}
         if request.method == "POST":
             chosen = {int(i) for i in request.POST.getlist("spaces") if i.isdigit()}
+            requested = 0
             for space in suggested:
-                if space.pk in chosen:
-                    space_services.join(user, space)
-                elif space.pk in joined:
+                if space.pk in chosen and space.pk not in joined:
+                    try:
+                        if space_services.request_to_join(user, space) == "requested":
+                            requested += 1
+                    except PermissionDenied:
+                        pass  # e.g. email not verified yet; they can ask again later
+                elif space.pk not in chosen and space.pk in joined:
                     space_services.leave(user, space)
+            if requested:
+                messages.info(request, f"Sent {requested} request{'s' if requested > 1 else ''} to join. "
+                                       "You'll be notified when you're approved.")
             user.onboarding_completed = True
             user.save(update_fields=["onboarding_completed"])
             messages.success(request, "You're all set. Welcome to NexSpace.")

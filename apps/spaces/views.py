@@ -13,7 +13,7 @@ from apps.posts.feed import annotate_for_user
 from apps.posts.models import Post
 
 from . import services
-from .models import Space, SpaceMembership
+from .models import Space, SpaceJoinRequest, SpaceMembership
 
 SPACE_TABS = [("posts", "Posts"), ("questions", "Questions"), ("members", "Members"), ("about", "About")]
 COURSE_TABS = [
@@ -50,11 +50,14 @@ def space_list_view(request):
     mine = [s for s in spaces if s.membership] + list(
         Space.objects.filter(pk__in=memberships.keys(), kind=Space.Kind.COURSE).select_related("course")
     )
-    for s in mine:
+    pending = services.pending_request_ids(request.user)
+    for s in mine + spaces:
         s.membership = memberships.get(s.pk)
+        s.pending = s.pk in pending
     return render(request, "spaces/list.html", {
         "mine": mine,
         "discover": [s for s in spaces if not s.membership],
+        "can_create": services.can_create_space(request.user),
     })
 
 
@@ -82,10 +85,21 @@ def _space_page(request, space, tab):
     tab_keys = [k for k, _ in tabs]
     if tab not in tab_keys:
         tab = tab_keys[0]
+    can_manage = services.can_manage(user, space)
+    can_see = services.can_see_inside(user, space)
+    if not can_see:  # private Space: outsiders only see About and the request button
+        tabs = [("about", "About")]
+        tab = "about"
+    elif can_manage and space.requires_approval:
+        tabs = list(tabs) + [("requests", "Requests")]
+        if request.GET.get("tab") == "requests":
+            tab = "requests"
     q = request.GET.get("q", "").strip()[:80]
     context = {
         "space": space, "course": course, "membership": membership, "tabs": tabs, "tab": tab, "q": q,
-        "can_manage": services.can_manage(user, space),
+        "can_manage": can_manage, "can_see": can_see,
+        "pending_request": SpaceJoinRequest.objects.filter(space=space, user=user, status="pending").exists(),
+        "request_count": space.join_requests.filter(status="pending").count() if can_manage else 0,
     }
     if course:
         reps = User.objects.filter(role_assignments__role=RoleAssignment.Role.COURSE_REP,
@@ -100,6 +114,8 @@ def _space_page(request, space, tab):
         if q:
             posts = posts.filter(Q(body__icontains=q) | Q(title__icontains=q))
         context["posts"] = list(annotate_for_user(posts, user)[:40])
+    elif tab == "requests":
+        context["requests"] = list(space.join_requests.filter(status="pending").select_related("user__profile"))
     elif tab in ("members", "people"):
         context["members"] = list(
             SpaceMembership.objects.filter(space=space).select_related("user__profile")
@@ -147,8 +163,15 @@ def membership_view(request, pk):
     action = request.POST.get("action")
     try:
         if action == "join":
-            services.join(request.user, space)
-            messages.success(request, f"Joined {space.name}.")
+            result = services.request_to_join(request.user, space, request.POST.get("message", ""))
+            messages.success(request, {
+                "joined": f"Joined {space.name}.", "member": f"You're already in {space.name}.",
+                "requested": f"Request sent. {space.name}'s managers will review it.",
+                "pending": "Your request is still waiting for approval.",
+            }[result])
+        elif action == "cancel":
+            services.cancel_request(request.user, space)
+            messages.success(request, "Request cancelled.")
         elif action == "leave":
             services.leave(request.user, space)
             messages.success(request, f"Left {space.name}.")
@@ -157,11 +180,46 @@ def membership_view(request, pk):
             messages.success(request, f"{'Muted' if action == 'mute' else 'Unmuted'} {space.name}.")
     except (PermissionDenied, ValidationError) as exc:
         messages.error(request, " ".join(getattr(exc, "messages", [str(exc)])))
+    except Exception as exc:  # rate limit
+        from apps.posts.services import RateLimited
+
+        if not isinstance(exc, RateLimited):
+            raise
+        messages.error(request, str(exc))
     return _back(request, space.get_absolute_url())
 
 
 @login_required
+@require_POST
+def request_decision_view(request, pk, request_id):
+    space = _dept_space(request, pk=pk)
+    join_request = get_object_or_404(SpaceJoinRequest.objects.select_related("user", "space"), pk=request_id, space=space)
+    approve = request.POST.get("decision") == "approve"
+    try:
+        services.decide_request(manager=request.user, join_request=join_request, approve=approve)
+        messages.success(request, f"{join_request.user.full_name} {'added' if approve else 'declined'}.")
+    except (PermissionDenied, ValidationError) as exc:
+        messages.error(request, " ".join(getattr(exc, "messages", [str(exc)])))
+    return redirect(f"{space.get_absolute_url()}?tab=requests")
+
+
+@login_required
+@require_POST
+def remove_member_view(request, pk, user_id):
+    space = _dept_space(request, pk=pk)
+    member = get_object_or_404(User, pk=user_id)
+    try:
+        services.remove_member(manager=request.user, space=space, user=member)
+        messages.success(request, f"{member.full_name} was removed from {space.name}.")
+    except (PermissionDenied, ValidationError) as exc:
+        messages.error(request, " ".join(getattr(exc, "messages", [str(exc)])))
+    return redirect(f"{space.get_absolute_url()}?tab={'people' if space.course_id else 'members'}")
+
+
+@login_required
 def space_create_view(request):
+    if not services.can_create_space(request.user):
+        raise PermissionDenied
     errors = []
     data = request.POST if request.method == "POST" else {}
     if request.method == "POST":
@@ -169,10 +227,11 @@ def space_create_view(request):
             space = services.create_space(
                 user=request.user, name=data.get("name", ""), description=data.get("description", ""),
                 rules=data.get("rules", ""), icon=data.get("icon", ""),
+                requires_approval=data.get("open_to_all") != "on",
             )
         except (ValidationError, PermissionDenied) as exc:
             errors = getattr(exc, "messages", [str(exc)])
         else:
-            messages.success(request, f"{space.name} is ready. Invite classmates to join.")
+            messages.success(request, f"{space.name} is ready. You'll approve people who ask to join.")
             return redirect(space.get_absolute_url())
     return render(request, "spaces/create.html", {"errors": errors, "data": data})

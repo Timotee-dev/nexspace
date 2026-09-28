@@ -13,10 +13,10 @@
     <h1>{{ space.name }}{% if space.is_official %} <span class="tag tag-official">Official</span>{% endif %}</h1>
     {% if space.description %}<p class="muted">{{ space.description }}</p>{% endif %}
     {% endif %}
-    <p class="small muted">{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted in your feeds{% endif %}</p>
+    <p class="small muted">{% if space.requires_approval %}🔒 Approval needed · {% endif %}{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted in your feeds{% endif %}</p>
   </div>
   <div class="space-header-actions">
-    {% include "partials/space_membership.html" %}
+    {% include "partials/space_membership.html" with pending=pending_request %}
     {% if membership %}
     <form method="post" action="{% url 'spaces:membership' space.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
       <button type="submit" name="action" value="{% if membership.is_muted %}unmute{% else %}mute{% endif %}" class="btn btn-quiet">{% if membership.is_muted %}Unmute{% else %}Mute{% endif %}</button>
@@ -25,11 +25,34 @@
   </div>
 </header>
 
+{% if can_manage and request_count and tab != "requests" %}<a class="nexai-launch" href="?tab=requests"><span aria-hidden="true">🔔</span><span>{{ request_count }} {% if request_count == 1 %}person wants{% else %}people want{% endif %} to join — review</span></a>{% endif %}
 <nav class="tabs" aria-label="{{ space.name }} sections">
-  {% for key, label in tabs %}<a href="?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+  {% for key, label in tabs %}<a href="?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}{% if key == "requests" and request_count %} <span class="tab-count">{{ request_count }}</span>{% endif %}</a>{% endfor %}
 </nav>
 
-{% if tab == "posts" or tab == "discussions" or tab == "questions" %}
+{% if not can_see %}
+<section class="empty">
+  <p style="font-size:2rem" aria-hidden="true">🔒</p>
+  <h2>This Space is private</h2>
+  <p>{% if pending_request %}Your request is waiting for approval. You'll get a notification when a manager decides.{% else %}Its managers approve everyone who joins. Send a request and you'll be notified when you're in.{% endif %}</p>
+</section>
+{% if space.description or space.rules %}<section class="panel stack" style="margin-top:16px">{% if space.description %}<p>{{ space.description }}</p>{% endif %}{% if space.rules %}<div><h2 class="section-title">Rules</h2><div class="post-body">{{ space.rules|render_body }}</div></div>{% endif %}</section>{% endif %}
+
+{% elif tab == "requests" %}
+  <ul class="member-list">
+    {% for r in requests %}
+    <li class="request-row">
+      <a href="{% url 'accounts:profile' r.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=r.user %}<span><b>{{ r.user.full_name }}</b><span class="small muted">{{ r.user.level_label }} · asked {{ r.created_at|ago }}{% if r.message %} · "{{ r.message }}"{% endif %}</span></span></a>
+      <form method="post" action="{% url 'spaces:request-decision' space.pk r.pk %}" class="request-actions">{% csrf_token %}
+        <button name="decision" value="approve" class="btn btn-primary btn-sm">Approve</button>
+        <button name="decision" value="decline" class="btn btn-ghost btn-sm">Decline</button>
+      </form>
+    </li>
+    {% empty %}<li class="empty empty-sm"><p>No one is waiting to join.</p></li>
+    {% endfor %}
+  </ul>
+
+{% elif tab == "posts" or tab == "discussions" or tab == "questions" %}
   {% if course %}<a class="nexai-launch" href="{% url 'nexai:ask' %}?course={{ course.slug }}"><span class="nexai-mark" aria-hidden="true">✦</span><span>Ask NexAI about {{ course.code }}</span></a>{% endif %}
   <div class="space-toolbar">
     <form method="get" class="search-inline" role="search">
@@ -75,7 +98,8 @@
 {% elif tab == "members" or tab == "people" %}
   <ul class="member-list">
     {% for m in members %}
-    <li><a href="{% url 'accounts:profile' m.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=m.user %}<span><b>{{ m.user.full_name }}</b><span class="small muted">{{ m.user.level_label }}{% if m.role == "moderator" %} · Moderator{% endif %}</span></span></a></li>
+    <li class="request-row"><a href="{% url 'accounts:profile' m.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=m.user %}<span><b>{{ m.user.full_name }}</b><span class="small muted">{{ m.user.level_label }}{% if m.role == "moderator" %} · Moderator{% endif %}</span></span></a>
+      {% if can_manage and m.user_id != user.pk and not space.course_id %}<form method="post" action="{% url 'spaces:remove-member' space.pk m.user_id %}" data-confirm="Remove {{ m.user.full_name }} from {{ space.name }}?">{% csrf_token %}<button class="btn btn-quiet btn-sm">Remove</button></form>{% endif %}</li>
     {% empty %}<li class="empty empty-sm"><p>No members yet.</p></li>
     {% endfor %}
   </ul>

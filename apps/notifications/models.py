@@ -23,6 +23,7 @@ class Notification(models.Model):
         OPPORTUNITY = "opportunity", "New opportunity"
         OPPORTUNITY_REMINDER = "opportunity_reminder", "Deadline reminder"
         STUDY_GROUP = "study_group", "Study group"
+        SPACE_REQUEST = "space_request", "Space join request"
 
     class PushStatus(models.TextChoices):
         NONE = "none", "Not sent"

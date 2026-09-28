@@ -27,6 +27,11 @@ class Space(models.Model):
     rules = models.TextField(max_length=2000, blank=True)
     icon = models.CharField(max_length=4, blank=True, help_text="An emoji or short symbol")
     is_official = models.BooleanField(default=False)
+    # Approval-only Spaces are private: only approved members see their posts and member list.
+    # Course Spaces stay open, since joining a course is how students get its materials.
+    requires_approval = models.BooleanField(
+        default=True, help_text="Members must be approved by the Space's managers before they can join"
+    )
     member_count = models.PositiveIntegerField(default=0)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -64,3 +69,24 @@ class SpaceMembership(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["space", "user"], name="unique_space_membership")]
         indexes = [models.Index(fields=["user", "is_muted"])]
+
+
+class SpaceJoinRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for approval"
+        APPROVED = "approved", "Approved"
+        DECLINED = "declined", "Declined"
+
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name="join_requests")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="space_join_requests")
+    message = models.CharField(max_length=200, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [models.UniqueConstraint(fields=["space", "user"], name="one_join_request_per_space")]
+        indexes = [models.Index(fields=["space", "status"])]

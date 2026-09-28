@@ -15,8 +15,16 @@ class PostQuerySet(models.QuerySet):
         return self.filter(is_deleted=False, is_hidden=False)
 
     def for_viewer(self, user):
-        """Posts a user may see: live posts in their own department."""
-        return self.visible().filter(department_id=user.department_id)
+        """Posts a user may see: live posts in their own department, excluding posts inside
+        approval-only Spaces they aren't a member of."""
+        from django.db.models import Exists, OuterRef
+
+        from apps.spaces.models import SpaceMembership
+
+        member = SpaceMembership.objects.filter(space=OuterRef("space"), user=user)
+        return self.visible().filter(department_id=user.department_id).filter(
+            Q(space__isnull=True) | Q(space__requires_approval=False) | Exists(member)
+        )
 
     def with_related(self):
         return self.select_related(

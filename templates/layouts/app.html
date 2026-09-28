@@ -3,17 +3,23 @@
 {% with path=request.path %}
 <div class="shell {% block shell_class %}{% endblock %}">
   <header class="topbar mobile-only">
-    <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
+    <div class="topbar-start">
+      <button type="button" class="drawer-toggle" data-drawer-open aria-controls="app-sidebar" aria-expanded="false" aria-label="Open menu">{% include "partials/avatar.html" with person=user %}</button>
+      <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
+    </div>
     <div class="topbar-actions">
       <a class="icon-btn" href="{% url 'search:search' %}" aria-label="Search"><svg class="icon"><use href="#i-search"/></svg></a>
       <a class="icon-btn" href="{% url 'notifications:list' %}" aria-label="Notifications"><span class="icon-wrap"><svg class="icon"><use href="#i-bell"/></svg><span class="badge" data-unread{% if not unread_notifications %} hidden{% endif %}>{% if unread_notifications > 99 %}99+{% else %}{{ unread_notifications }}{% endif %}</span></span></a>
-      {% if is_moderator %}<a class="icon-btn" href="{% url 'moderation:queue' %}" aria-label="Moderation"><svg class="icon"><use href="#i-shield"/></svg></a>{% endif %}
-      <a class="icon-btn" href="{% url 'accounts:settings-profile' %}" aria-label="Settings"><svg class="icon"><use href="#i-settings"/></svg></a>
     </div>
   </header>
 
-  <nav class="sidebar" aria-label="Main">
-    <a class="wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
+  <div class="drawer-backdrop" data-drawer-close aria-hidden="true"></div>
+  <nav class="sidebar" id="app-sidebar" aria-label="Main">
+    <div class="drawer-head">
+      <a class="drawer-profile" href="{% url 'accounts:profile' user.username %}">{% include "partials/avatar.html" with person=user size_class="avatar-lg" %}<span><b>{{ user.display_name }}</b><span class="muted small">@{{ user.username }}{% if user.staff_badge %} · {{ user.staff_badge }}{% endif %}</span></span></a>
+      <button type="button" class="icon-btn" data-drawer-close aria-label="Close menu">×</button>
+    </div>
+    <a class="wordmark sidebar-wordmark" href="{% url 'core:home' %}" aria-label="NexSpace home"><span class="wordmark-glyph">N</span><span class="wordmark-text">NexSpace</span></a>
     <ul class="nav">
       {% include "partials/nav_items.html" %}
       <li><button type="button" data-theme-toggle aria-label="Change theme"><svg class="icon"><use href="#i-theme"/></svg><span class="nav-label">Theme</span></button></li>
@@ -22,7 +28,7 @@
     <div class="sidebar-spacer"></div>
     <a class="sidebar-user" href="{% url 'accounts:profile' user.username %}">
       {% include "partials/avatar.html" with person=user %}
-      <span class="sidebar-user-text"><b>{{ user.full_name }}</b><span>@{{ user.username }}</span></span>
+      <span class="sidebar-user-text"><b>{{ user.display_name }}</b><span>@{{ user.username }}</span></span>
     </a>
     <form method="post" action="{% url 'accounts:logout' %}">
       {% csrf_token %}

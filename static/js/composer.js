@@ -6,7 +6,7 @@ const form = document.querySelector("[data-composer]");
 if (form) {
   const DRAFT_KEY = "nexspace-draft";
   const MAX = { images: 4, files: 3 };
-  const MAX_BYTES = { images: 5 * 1024 * 1024, files: 20 * 1024 * 1024 };
+  const MAX_BYTES = { images: 5 * 1024 * 1024, files: 10 * 1024 * 1024 };
 
   // ---- Poll options ----
   const options = form.querySelector("[data-poll-options]");

@@ -81,7 +81,7 @@ def _detect_document(file) -> str | None:
 def validate_document_upload(file) -> str:
     """Validate a PDF/Word/PowerPoint upload. Returns the safe content type."""
     if file.size > settings.MAX_DOCUMENT_UPLOAD_BYTES:
-        raise ValidationError("Files must be 20 MB or smaller.")
+        raise ValidationError(f"Files must be {settings.MAX_DOCUMENT_MB} MB or smaller.")
     ext = os.path.splitext(file.name)[1].lower()
     if ext not in DOCUMENT_TYPES:
         raise ValidationError("Upload a PDF, Word (.doc, .docx) or PowerPoint (.ppt, .pptx) file.")

@@ -93,7 +93,7 @@ def compose_view(request):
 def build_thread(post, user):
     comments = list(
         Comment.objects.filter(post=post)
-        .select_related("author__profile", "reply_to")
+        .select_related("author__profile", "author__staff_profile", "reply_to")
         .annotate(
             my_vote_up=Exists(CommentVote.objects.filter(comment=OuterRef("pk"), user=user, value=1)),
             my_vote_down=Exists(CommentVote.objects.filter(comment=OuterRef("pk"), user=user, value=-1)),

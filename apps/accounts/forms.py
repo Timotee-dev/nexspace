@@ -15,16 +15,41 @@ class DepartmentChoiceField(forms.ModelChoiceField):
 
 
 class SignupForm(forms.Form):
+    ACCOUNT_TYPES = [("student", "Student"), ("staff", "Staff (HOD, lecturer, adviser, exam officer)")]
+
+    account_type = forms.ChoiceField(choices=ACCOUNT_TYPES, initial="student", widget=forms.RadioSelect,
+                                     label="I am a", required=False)
     full_name = forms.CharField(max_length=120, widget=forms.TextInput(attrs={"autocomplete": "name"}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={"autocomplete": "email"}))
     department = DepartmentChoiceField(
         queryset=Department.objects.filter(is_active=True).select_related("faculty__university"),
         empty_label="Choose your department",
     )
-    level = forms.TypedChoiceField(choices=[("", "Choose your level"), *Level.choices], coerce=int)
+    level = forms.TypedChoiceField(choices=[("", "Choose your level"), *Level.choices], coerce=int,
+                                   required=False, empty_value=None)
     matric_number = forms.CharField(
         max_length=30, required=False, help_text="Optional. Only you can see it unless you choose to show it."
     )
+    # Staff only
+    position = forms.ChoiceField(choices=[("", "Choose your position")], required=False)
+    title = forms.ChoiceField(choices=[], required=False)
+    staff_id = forms.CharField(max_length=30, required=False, label="Staff ID",
+                               help_text="Optional, but it helps your HOD verify you quickly.")
+    courses = forms.ModelMultipleChoiceField(queryset=None, required=False, widget=forms.CheckboxSelectMultiple,
+                                             label="Courses you teach")
+    adviser_level = forms.TypedChoiceField(choices=[("", "Choose the level you advise"), *Level.choices],
+                                           coerce=int, required=False, empty_value=None, label="Level you advise")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.academics.models import Course
+
+        from .models import StaffProfile
+
+        self.fields["position"].choices = [("", "Choose your position"), *StaffProfile.Position.choices]
+        self.fields["title"].choices = [(v, l) for v, l in StaffProfile.Title.choices]
+        self.fields["courses"].queryset = Course.objects.filter(is_active=True).select_related("department")
+        self.fields["courses"].label_from_instance = lambda c: f"{c.code} — {c.title}"
     password = forms.CharField(widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
     confirm_password = forms.CharField(widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
 
@@ -48,6 +73,22 @@ class SignupForm(forms.Form):
 
     def clean(self):
         data = super().clean()
+        data["account_type"] = data.get("account_type") or "student"
+        if data["account_type"] == "staff":
+            position = data.get("position")
+            if not position:
+                self.add_error("position", "Choose your position.")
+            if position == "lecturer":
+                dept = data.get("department")
+                courses = [c for c in data.get("courses") or [] if dept and c.department_id == dept.pk]
+                if not courses:
+                    self.add_error("courses", "Pick at least one course you teach in this department.")
+                data["courses"] = courses
+            if position == "level_adviser" and not data.get("adviser_level"):
+                self.add_error("adviser_level", "Choose the level you advise.")
+            data["level"] = None
+        elif not data.get("level"):
+            self.add_error("level", "Choose your level.")
         password, confirm = data.get("password"), data.get("confirm_password")
         if password and confirm and password != confirm:
             self.add_error("confirm_password", "Passwords don't match.")
@@ -85,7 +126,7 @@ class ProfileForm(forms.Form):
         regex=r"^[a-z0-9_]{3,30}$",
         error_messages={"invalid": "Use 3–30 lowercase letters, numbers or underscores."},
     )
-    level = forms.TypedChoiceField(choices=Level.choices, coerce=int)
+    level = forms.TypedChoiceField(choices=Level.choices, coerce=int, required=False, empty_value=None)
     matric_number = forms.CharField(max_length=30, required=False)
     avatar = forms.ImageField(required=False)
     remove_avatar = forms.BooleanField(required=False)
@@ -100,6 +141,11 @@ class ProfileForm(forms.Form):
     def __init__(self, *args, user, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
+        if user.staff:  # staff don't belong to a level
+            del self.fields["level"]
+            del self.fields["matric_number"]
+        else:
+            self.fields["level"].required = True
 
     @classmethod
     def initial_for(cls, user):
@@ -125,7 +171,7 @@ class ProfileForm(forms.Form):
         return username
 
     def clean_matric_number(self):
-        value = self.cleaned_data.get("matric_number", "").strip().upper()
+        value = (self.cleaned_data.get("matric_number") or "").strip().upper()
         if value and User.objects.filter(matric_number=value).exclude(pk=self.user.pk).exists():
             raise forms.ValidationError("This matric number is already linked to another account.")
         return value or None
@@ -154,8 +200,9 @@ class ProfileForm(forms.Form):
         user, profile, data = self.user, self.user.profile, self.cleaned_data
         user.full_name = data["full_name"]
         user.username = data["username"]
-        user.level = data["level"]
-        user.matric_number = data["matric_number"]
+        if "level" in self.fields:
+            user.level = data["level"]
+            user.matric_number = data["matric_number"]
         user.save()
         if data.get("remove_avatar") and profile.avatar:
             profile.avatar.delete(save=False)

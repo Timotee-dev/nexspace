@@ -6,7 +6,8 @@
   <p class="comment-deleted">Hidden while moderators review it.</p>
   {% else %}
   <div class="comment-head">
-    <a href="{% url 'accounts:profile' comment.author.username %}" class="comment-author">{% include "partials/avatar.html" with person=comment.author size_class="avatar-sm" %}<b>{{ comment.author.full_name }}</b></a>
+    {% if comment.author.is_active %}<a href="{% url 'accounts:profile' comment.author.username %}" class="comment-author">{% include "partials/avatar.html" with person=comment.author size_class="avatar-sm" %}<b>{{ comment.author.display_name }}</b></a>{% if comment.author.staff_badge %}<span class="tag tag-staff">{{ comment.author.staff_badge }}</span>{% endif %}
+    {% else %}<span class="comment-author">{% include "partials/avatar.html" with person=comment.author size_class="avatar-sm" %}<b>{{ comment.author.full_name }}</b></span>{% endif %}
     {% if comment.author_id == post.author_id and not post.is_anonymous %}<span class="tag">Author</span>{% endif %}
     {% if post.accepted_comment_id == comment.pk %}<span class="tag tag-solved">Accepted answer</span>{% endif %}
     <time class="muted small" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|ago }}</time>

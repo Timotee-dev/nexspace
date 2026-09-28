@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Community guidelines{% endblock %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block body %}
+{# Edit this page before launch so it matches your department's rules. #}
+<main class="legal" id="main">
+  <a class="wordmark" href="/"><span class="wordmark-glyph">N</span>NexSpace</a>
+  <h1>Community guidelines</h1>
+  <p class="muted">NexSpace is your department's home. Keep it useful and safe for everyone.</p>
+
+  <h2>Do</h2>
+  <ul>
+    <li>Help each other. Answer questions, share notes and past questions, and credit where things came from.</li>
+    <li>Disagree respectfully. Argue with ideas, not people.</li>
+    <li>Keep posts in the right place — course questions in the course, club talk in its Space.</li>
+    <li>Report anything that breaks these rules instead of replying to it.</li>
+  </ul>
+
+  <h2>Don't</h2>
+  <ul>
+    <li>Harass, bully, threaten or insult anyone — including lecturers and staff.</li>
+    <li>Post hateful, sexual or violent content, or other people's private information.</li>
+    <li>Share exam questions before an exam, sell answers, or help others cheat on graded work.</li>
+    <li>Spam, advertise repeatedly, or post misleading information, scams or fake opportunities.</li>
+    <li>Upload files you don't have the right to share.</li>
+    <li>Use anonymous posting to attack someone. Anonymous means anonymous to students, not to moderators.</li>
+  </ul>
+
+  <h2>What happens if rules are broken</h2>
+  <p>Content reported by five people is hidden until a moderator reviews it. Moderators can remove content (the author loses 20 NexScore), suspend an account for 7 days (read-only), or — for serious or repeated problems — department admins can ban it. Every action is recorded in a moderation log.</p>
+  <p><a href="{% url 'core:privacy' %}">Privacy notice</a> · <a href="/">NexSpace home</a></p>
+</main>
+{% endblock %}

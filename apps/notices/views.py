@@ -15,15 +15,25 @@ from .forms import AnnouncementForm, EventForm
 from .models import Announcement
 
 
-def _publisher_context(user):
-    is_admin = user.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=user.department)
-    rep_courses = list(Course.objects.filter(role_assignments__user=user,
-                                             role_assignments__role=RoleAssignment.Role.COURSE_REP))
-    return is_admin, rep_courses
+def _scope_or_403(user):
+    scope = services.publish_scope(user)
+    if not services.is_publisher(user):
+        raise PermissionDenied
+    return scope
 
 
 def _target_kwargs(d):
     return {k: d.get(k) for k in ("audience", "target_level", "target_course", "target_space")}
+
+
+def _initial_from_query(request):
+    initial = {k: request.GET[k] for k in ("audience",) if request.GET.get(k)}
+    if request.GET.get("course"):
+        initial["target_course"] = Course.objects.filter(slug=request.GET["course"],
+                                                         department_id=request.user.department_id).first()
+    if request.GET.get("level", "").isdigit():
+        initial["target_level"] = int(request.GET["level"])
+    return initial
 
 
 @login_required
@@ -39,15 +49,24 @@ def announcements_view(request):
     })
 
 
+def _visible_announcement(user, pk):
+    """Its audience can read it; so can department admins and moderators (they manage all of them)."""
+    item = get_object_or_404(Announcement.objects.select_related("target_course", "target_space", "created_by"),
+                             pk=pk, is_removed=False, department_id=user.department_id)
+    if user.can_moderate(user.department) or Announcement.objects.relevant_to(user).filter(pk=pk).exists():
+        return item
+    raise Http404
+
+
 @login_required
 def announcement_detail_view(request, pk):
-    item = get_object_or_404(Announcement.objects.relevant_to(request.user).filter(is_removed=False), pk=pk)
+    item = _visible_announcement(request.user, pk)
     return render(request, "notices/announcement_detail.html", {"item": item})
 
 
 @login_required
 def announcement_attachment_view(request, pk):
-    item = get_object_or_404(Announcement.objects.relevant_to(request.user).filter(is_removed=False), pk=pk)
+    item = _visible_announcement(request.user, pk)
     if not item.attachment:
         raise Http404
     if hasattr(item.attachment.storage, "path"):
@@ -60,11 +79,9 @@ def announcement_attachment_view(request, pk):
 
 @login_required
 def announcement_create_view(request):
-    is_admin, rep_courses = _publisher_context(request.user)
-    if not (is_admin or rep_courses):
-        raise PermissionDenied
-    form = AnnouncementForm(request.POST or None, request.FILES or None)
-    form.setup_audience(request.user, is_admin, rep_courses)
+    scope = _scope_or_403(request.user)
+    form = AnnouncementForm(request.POST or None, request.FILES or None, initial=_initial_from_query(request))
+    form.setup_audience(request.user, scope)
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         try:
@@ -94,11 +111,12 @@ def calendar_view(request):
 
 @login_required
 def event_create_view(request):
-    is_admin, rep_courses = _publisher_context(request.user)
-    if not (is_admin or rep_courses):
-        raise PermissionDenied
-    form = EventForm(request.POST or None)
-    form.setup_audience(request.user, is_admin, rep_courses)
+    scope = _scope_or_403(request.user)
+    initial = _initial_from_query(request)
+    if request.GET.get("kind"):
+        initial["kind"] = request.GET["kind"]
+    form = EventForm(request.POST or None, initial=initial)
+    form.setup_audience(request.user, scope)
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         try:

@@ -6,6 +6,7 @@ department; super admins can switch department and manage institutions and topic
 from functools import wraps
 
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -16,8 +17,8 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from apps.academics.models import AcademicSession, Course, Department, Faculty, Level, University
-from apps.accounts.models import RoleAssignment, User
-from apps.accounts.services import assign_role, revoke_role
+from apps.accounts.models import RoleAssignment, StaffProfile, User
+from apps.accounts.services import assign_role, revoke_role, verify_staff
 from apps.core.models import audit
 from apps.moderation import services as moderation
 from apps.notices.models import Announcement
@@ -112,7 +113,9 @@ def users_view(request):
 class RoleForm(forms.Form):
     role = forms.ChoiceField(choices=[(v, l) for v, l in RoleAssignment.Role.choices if v != "super_admin"])
     course = forms.ModelChoiceField(queryset=Course.objects.none(), required=False,
-                                    help_text="Required for course reps", empty_label="Choose a course")
+                                    help_text="For course reps and lecturers", empty_label="Choose a course")
+    level = forms.TypedChoiceField(choices=[("", "Choose a level"), *Level.choices], coerce=int, required=False,
+                                   empty_value=None, help_text="For level advisers")
 
     def __init__(self, *args, department, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,8 +123,10 @@ class RoleForm(forms.Form):
 
     def clean(self):
         data = super().clean()
-        if data.get("role") == RoleAssignment.Role.COURSE_REP and not data.get("course"):
-            self.add_error("course", "Choose which course they represent.")
+        if data.get("role") in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LECTURER) and not data.get("course"):
+            self.add_error("course", "Choose the course.")
+        if data.get("role") == RoleAssignment.Role.LEVEL_ADVISER and not data.get("level"):
+            self.add_error("level", "Choose the level they advise.")
         return data
 
 
@@ -148,14 +153,19 @@ def user_action_view(request, pk):
     dept = request.manage_department
     member = get_object_or_404(User, pk=pk, department=dept)
     action = request.POST.get("action")
+    if member.is_owner and action in ("revoke_role", "suspend", "ban") and request.user.pk != member.pk:
+        messages.error(request, "This is the platform owner's account. It can't be restricted from here.")
+        return redirect("manage:user", pk=member.pk)
     try:
         if action == "assign_role":
             form = RoleForm(request.POST, department=dept)
             if not form.is_valid():
                 raise ValidationError(" ".join(e for errs in form.errors.values() for e in errs))
-            role, course = form.cleaned_data["role"], form.cleaned_data.get("course")
-            if role == RoleAssignment.Role.COURSE_REP:
+            role, course, level = form.cleaned_data["role"], form.cleaned_data.get("course"), form.cleaned_data.get("level")
+            if role in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LECTURER):
                 assign_role(user=member, role=role, course=course, granted_by=request.user)
+            elif role == RoleAssignment.Role.LEVEL_ADVISER:
+                assign_role(user=member, role=role, department=dept, level=level, granted_by=request.user)
             else:
                 assign_role(user=member, role=role, department=dept, granted_by=request.user)
             messages.success(request, "Role assigned.")
@@ -163,7 +173,8 @@ def user_action_view(request, pk):
             ra = get_object_or_404(RoleAssignment, pk=request.POST.get("assignment"), user=member)
             if ra.role == RoleAssignment.Role.SUPER_ADMIN and not request.user.is_platform_admin:
                 raise PermissionDenied("Only super admins can change super admins.")
-            revoke_role(user=member, role=ra.role, department=ra.department, course=ra.course, revoked_by=request.user)
+            revoke_role(user=member, role=ra.role, department=ra.department, course=ra.course, level=ra.level,
+                        revoked_by=request.user)
             messages.success(request, "Role removed.")
         elif action == "verify_email":
             member.email_verified = True
@@ -390,3 +401,31 @@ def topic_toggle_view(request, pk):
     topic.is_active = not topic.is_active
     topic.save(update_fields=["is_active"])
     return redirect("manage:topics")
+
+
+
+# --- Staff verification -------------------------------------------------------------
+@admin_required
+def staff_view(request):
+    dept = request.manage_department
+    staff = StaffProfile.objects.filter(user__department=dept).select_related("user", "decided_by").prefetch_related(
+        "requested_courses", "user__role_assignments__course")
+    return _render(request, "manage/staff.html", {
+        "pending": [s for s in staff if s.status == StaffProfile.Status.PENDING],
+        "verified": [s for s in staff if s.status == StaffProfile.Status.VERIFIED],
+        "rejected": [s for s in staff if s.status == StaffProfile.Status.REJECTED],
+        "can_verify": request.user.is_platform_admin or settings.STAFF_VERIFICATION == "department",
+    }, "staff")
+
+
+@admin_required
+@require_POST
+def staff_decision_view(request, pk):
+    staff = get_object_or_404(StaffProfile.objects.select_related("user"), pk=pk, user__department=request.manage_department)
+    approve = request.POST.get("decision") == "approve"
+    try:
+        verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""))
+        messages.success(request, f"{staff.user.full_name} {'verified as ' + staff.get_position_display() if approve else 'not verified'}.")
+    except PermissionDenied as exc:
+        messages.error(request, str(exc) or "You can't verify this account.")
+    return redirect("manage:staff")

@@ -102,12 +102,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.is_active and self.email_verified and not self.is_suspended
 
     # --- Roles -------------------------------------------------------------
-    def has_role(self, role: str, department=None, course=None) -> bool:
+    def has_role(self, role: str, department=None, course=None, level=None) -> bool:
         """True if the user holds `role` for the given scope.
 
-        Super admins hold every role everywhere. Department admins act as course reps and
-        moderators for their department. A course-scoped assignment only counts for that
-        course; a department-scoped one for that department; an unscoped one everywhere.
+        Super admins hold every role everywhere. Department admins (including the HOD) act as
+        course reps, lecturers, level advisers, exam officers and moderators for their department.
+        Lecturers act as course reps for their courses. Course-scoped assignments count for that
+        course; level-scoped ones for that level; department-scoped ones for the department.
         """
         if not self.is_active:
             return False
@@ -118,19 +119,60 @@ class User(AbstractBaseUser, PermissionsMixin):
             return True
         if course is not None:
             department = course.department
+        R = RoleAssignment.Role
         roles = {role}
-        if role in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.MODERATOR):
-            roles.add(RoleAssignment.Role.DEPARTMENT_ADMIN)
+        if role in (R.COURSE_REP, R.LECTURER, R.LEVEL_ADVISER, R.EXAM_OFFICER, R.MODERATOR):
+            roles.add(R.DEPARTMENT_ADMIN)
+        if role == R.COURSE_REP:
+            roles.add(R.LECTURER)  # lecturers can do everything a course rep can for their courses
         assignments = assignments.filter(role__in=roles)
         if department is None and course is None:
-            return assignments.exists()
-        scope = Q(department=department, course__isnull=True) | Q(department__isnull=True, course__isnull=True)
+            return assignments.exists() if level is None else assignments.filter(Q(level=level) | Q(
+                level__isnull=True, role=R.DEPARTMENT_ADMIN)).exists()
+        whole_dept = Q(department=department, course__isnull=True, level__isnull=True)
+        scope = whole_dept | Q(department__isnull=True, course__isnull=True, level__isnull=True)
         if course is not None:
             scope |= Q(course=course)
+        if level is not None:
+            scope |= Q(department=department, level=level)
         return assignments.filter(scope).exists()
+
+    # --- Staff -------------------------------------------------------------
+    @property
+    def staff(self):
+        """The verified-or-pending StaffProfile, or None for students."""
+        try:
+            return self.staff_profile
+        except StaffProfile.DoesNotExist:
+            return None
+
+    @property
+    def is_verified_staff(self) -> bool:
+        return self.staff is not None and self.staff.status == StaffProfile.Status.VERIFIED
+
+    @property
+    def staff_badge(self) -> str:
+        """Short badge shown next to a verified staff member's name, e.g. "HOD" or "Lecturer"."""
+        return self.staff.get_position_display() if self.is_verified_staff else ""
+
+    @property
+    def display_name(self) -> str:
+        if self.is_verified_staff and self.staff.title:
+            return f"{self.staff.get_title_display()} {self.full_name}"
+        return self.full_name
+
+    @property
+    def has_dashboard(self) -> bool:
+        return self.is_superuser or self.staff is not None or self.role_assignments.exists()
 
     def can_moderate(self, department) -> bool:
         return self.has_role(RoleAssignment.Role.MODERATOR, department=department)
+
+    @property
+    def is_owner(self) -> bool:
+        from .owner import is_owner_email
+
+        return is_owner_email(self.email) and self.email_verified
 
     @property
     def is_platform_admin(self) -> bool:
@@ -207,6 +249,9 @@ class RoleAssignment(models.Model):
 
     class Role(models.TextChoices):
         COURSE_REP = "course_rep", "Course Rep"
+        LECTURER = "lecturer", "Lecturer"
+        LEVEL_ADVISER = "level_adviser", "Level Adviser"
+        EXAM_OFFICER = "exam_officer", "Exam Officer"
         MODERATOR = "moderator", "Moderator"
         DEPARTMENT_ADMIN = "department_admin", "Department Admin"
         SUPER_ADMIN = "super_admin", "Super Admin"
@@ -218,7 +263,10 @@ class RoleAssignment(models.Model):
     )
     course = models.ForeignKey(
         "academics.Course", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments",
-        help_text="Course reps: the course they represent (leave department empty)",
+        help_text="Course reps and lecturers: the course (leave department empty)",
+    )
+    level = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Level advisers: the level they advise (with the department)"
     )
     granted_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="roles_granted"
@@ -229,8 +277,12 @@ class RoleAssignment(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "role", "department"],
-                condition=Q(department__isnull=False),
+                condition=Q(department__isnull=False, level__isnull=True),
                 name="unique_scoped_role",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "role", "department", "level"], condition=Q(level__isnull=False),
+                name="unique_level_role",
             ),
             models.UniqueConstraint(
                 fields=["user", "role", "course"], condition=Q(course__isnull=False), name="unique_course_role"
@@ -242,5 +294,56 @@ class RoleAssignment(models.Model):
         ]
 
     def __str__(self):
-        scope = self.course.code if self.course_id else (self.department.name if self.department else "all departments")
+        if self.course_id:
+            scope = self.course.code
+        elif self.level:
+            scope = f"{self.level} Level, {self.department.name}"
+        else:
+            scope = self.department.name if self.department else "all departments"
         return f"{self.user.username}: {self.get_role_display()} ({scope})"
+
+
+class StaffProfile(models.Model):
+    """Staff members (HOD, lecturers, level advisers, exam officers). Signing up as staff creates a
+    *pending* profile; staff powers are only granted when a department admin/HOD verifies it."""
+
+    class Position(models.TextChoices):
+        HOD = "hod", "HOD"
+        LECTURER = "lecturer", "Lecturer"
+        LEVEL_ADVISER = "level_adviser", "Level Adviser"
+        EXAM_OFFICER = "exam_officer", "Exam Officer"
+
+    class Title(models.TextChoices):
+        PROF = "prof", "Prof."
+        DR = "dr", "Dr."
+        ENGR = "engr", "Engr."
+        MR = "mr", "Mr."
+        MRS = "mrs", "Mrs."
+        MS = "ms", "Ms."
+        NONE = "", "No title"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for verification"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Not verified"
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="staff_profile")
+    position = models.CharField(max_length=16, choices=Position.choices)
+    title = models.CharField(max_length=6, choices=Title.choices, blank=True)
+    staff_id = models.CharField(max_length=30, blank=True, help_text="Optional, helps the HOD verify you")
+    office = models.CharField(max_length=120, blank=True)
+    office_hours = models.CharField(max_length=160, blank=True)
+    requested_courses = models.ManyToManyField("academics.Course", blank=True, related_name="+",
+                                               help_text="Lecturers: courses they say they teach")
+    requested_level = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Level advisers")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    note = models.CharField(max_length=300, blank=True, help_text="Reason if not verified")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status"])]
+
+    def __str__(self):
+        return f"{self.get_position_display()}: {self.user.full_name} ({self.get_status_display()})"

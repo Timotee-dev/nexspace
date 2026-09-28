@@ -31,6 +31,14 @@ DEMO_USERS = [
     ("fresher@nexspace.test", "Emeka Obi", Level.L100, None, "", [], []),
 ]
 
+DEMO_STAFF = [
+    # email, full name, title, position, courses, level, verified
+    ("lecturer@nexspace.test", "Funmi Adebayo", "dr", "lecturer", ["CSC 301", "CSC 305"], None, True),
+    ("adviser@nexspace.test", "Kunle Ojo", "mr", "level_adviser", [], 300, True),
+    ("exams@nexspace.test", "Grace Eze", "mrs", "exam_officer", [], None, True),
+    ("newstaff@nexspace.test", "Bola Martins", "dr", "lecturer", ["CSC 401"], None, False),
+]
+
 
 def make_pdf(pages):
     """Build a small, valid PDF with real text (one list of lines per page) for demo resources."""
@@ -145,6 +153,7 @@ class Command(BaseCommand):
             self._seed_posts(dept)
         self._seed_phase3(dept)
         self._seed_phase4(dept)
+        self._seed_staff(dept)
 
         self.stdout.write(self.style.SUCCESS(f"Demo data ready ({created} new users)."))
         self.stdout.write(f"All demo accounts use the password: {DEMO_PASSWORD}")
@@ -374,4 +383,28 @@ class Command(BaseCommand):
         from apps.nexai.indexing import index_pending
 
         index_pending(limit=100)
+        cache.clear()
+
+    def _seed_staff(self, dept):
+        from django.core.cache import cache
+
+        from apps.academics.models import Course
+        from apps.accounts.models import StaffProfile
+        from apps.accounts.services import register_staff, verify_staff
+
+        if StaffProfile.objects.filter(user__department=dept).exists():
+            return
+        cache.clear()
+        hod = User.objects.get(email="deptadmin@nexspace.test")
+        StaffProfile.objects.create(user=hod, position=StaffProfile.Position.HOD, title="prof",
+                                    status=StaffProfile.Status.VERIFIED, office="Room 4, Computing building",
+                                    office_hours="Mondays 10am to 12pm")
+        User.objects.filter(pk=hod.pk).update(level=None)
+        for email, name, title, position, codes, level, verified in DEMO_STAFF:
+            user = register_staff(email=email, password=DEMO_PASSWORD, full_name=name, department=dept,
+                                  position=position, title=title, level=level,
+                                  courses=list(Course.objects.filter(department=dept, code__in=codes)))
+            User.objects.filter(pk=user.pk).update(email_verified=True, onboarding_completed=True)
+            if verified:
+                verify_staff(admin=User.objects.get(email="admin@nexspace.test"), staff=user.staff_profile, approve=True)
         cache.clear()

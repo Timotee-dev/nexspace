@@ -17,15 +17,28 @@ class AudienceMixin(forms.Form):
     target_space = forms.ModelChoiceField(queryset=Space.objects.none(), required=False, label="Space",
                                           empty_label="Choose a Space")
 
-    def setup_audience(self, user, is_admin, rep_courses):
-        if is_admin:
-            self.fields["target_course"].queryset = Course.objects.filter(department_id=user.department_id, is_active=True)
-            self.fields["target_space"].queryset = Space.objects.filter(department_id=user.department_id)
-        else:  # course reps: only their courses
-            self.fields["audience"].choices = [(Audience.COURSE, Audience.COURSE.label)]
-            self.fields["target_course"].queryset = Course.objects.filter(pk__in=[c.pk for c in rep_courses])
+    def setup_audience(self, user, scope):
+        """Offer only the audiences this person may publish to (see notices.services.publish_scope)."""
+        choices = []
+        if scope["department"]:
+            choices.append((Audience.DEPARTMENT, Audience.DEPARTMENT.label))
+        if scope["levels"]:
+            choices.append((Audience.LEVEL, Audience.LEVEL.label))
+            self.fields["target_level"].choices = [("", "Choose a level")] + [
+                (v, l) for v, l in Level.choices if v in scope["levels"]]
+        else:
             del self.fields["target_level"]
+        if scope["courses"]:
+            choices.append((Audience.COURSE, Audience.COURSE.label))
+            self.fields["target_course"].queryset = Course.objects.filter(pk__in=scope["courses"])
+        else:
+            del self.fields["target_course"]
+        if scope["spaces"]:
+            choices.append((Audience.SPACE, Audience.SPACE.label))
+            self.fields["target_space"].queryset = Space.objects.filter(department_id=user.department_id)
+        else:
             del self.fields["target_space"]
+        self.fields["audience"].choices = choices
 
 
 class AnnouncementForm(AudienceMixin):

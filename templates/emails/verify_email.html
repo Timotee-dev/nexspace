@@ -2,7 +2,7 @@
 <html><body style="margin:0;padding:24px;background:#f4f5f9;font-family:Arial,sans-serif;color:#151c2f">
 <table role="presentation" width="100%" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px">
 <tr><td>
-<p style="font-weight:800;font-size:20px;margin:0 0 24px">NexSpace</p>
+{% load static %}<p style="margin:0 0 24px"><img src="{{ site_url }}{% static 'img/icon-192.png' %}" width="40" height="40" alt="" style="vertical-align:middle;border-radius:10px"> <span style="font-weight:800;font-size:20px;vertical-align:middle;margin-left:8px">NexSpace</span></p>
 <p style="margin:0 0 16px">Hi {{ user.get_short_name }},</p>
 <p style="margin:0 0 24px">Confirm your email to start posting, commenting and sharing on NexSpace.</p>
 <p style="margin:0 0 24px"><a href="{{ link }}" style="background:#f5c451;color:#221a03;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-block">Verify my email</a></p>

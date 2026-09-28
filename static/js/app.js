@@ -207,3 +207,92 @@ if (document.body.dataset.authenticated === "true") {
   setInterval(refreshBadge, 60000);
   document.addEventListener("visibilitychange", refreshBadge);
 }
+
+// Sign-up: only show courses from the department the person picked
+const deptSelect = document.querySelector('.signup-form select[name="department"]');
+if (deptSelect) {
+  const syncCourses = () => {
+    document.querySelectorAll(".course-picks [data-dept]").forEach((label) => {
+      label.hidden = deptSelect.value !== "" && label.dataset.dept !== deptSelect.value;
+    });
+  };
+  deptSelect.addEventListener("change", syncCourses);
+  syncCourses();
+}
+
+// ---------- Phones: slide-in sidebar (tap your photo, or swipe right; swipe left to close) ----------
+(() => {
+  const drawer = document.getElementById("app-sidebar");
+  const backdrop = document.querySelector(".drawer-backdrop");
+  const toggles = document.querySelectorAll("[data-drawer-open]");
+  if (!drawer || !backdrop) return;
+  const phone = matchMedia("(max-width: 767px)");
+  const NO_SWIPE = ".chip-row, .tabs, .feed-tabs, .kind-picker, .settings-nav, .countdown-strip, .up-next, " +
+    ".table-wrap, .post-images, .quick-links, input, textarea, select, [data-no-swipe]";
+  let lastFocus = null;
+
+  const isOpen = () => document.body.classList.contains("drawer-open");
+  const setInert = () => { drawer.inert = phone.matches && !isOpen(); };
+
+  function open() {
+    lastFocus = document.activeElement;
+    document.body.classList.add("drawer-open");
+    toggles.forEach((t) => t.setAttribute("aria-expanded", "true"));
+    setInert();
+    drawer.querySelector("a, button")?.focus({ preventScroll: true });
+  }
+  function close() {
+    document.body.classList.remove("drawer-open");
+    toggles.forEach((t) => t.setAttribute("aria-expanded", "false"));
+    setInert();
+    lastFocus?.focus?.({ preventScroll: true });
+  }
+
+  toggles.forEach((t) => t.addEventListener("click", open));
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-drawer-close]")) close(); });
+  drawer.addEventListener("click", (e) => { if (phone.matches && e.target.closest("a")) close(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) close(); });
+  phone.addEventListener("change", () => { if (!phone.matches) close(); setInert(); });
+  setInert();
+
+  // Swipe gestures that follow your finger
+  let startX = 0, startY = 0, dx = 0, tracking = false, horizontal = null, startTime = 0;
+  const width = () => drawer.getBoundingClientRect().width || 300;
+
+  document.addEventListener("touchstart", (e) => {
+    if (!phone.matches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const target = e.target;
+    if (!isOpen() && target.closest(NO_SWIPE)) return;  // let horizontal scrollers and forms scroll
+    startX = t.clientX; startY = t.clientY; dx = 0; tracking = true; horizontal = null; startTime = Date.now();
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!tracking) return;
+    const t = e.touches[0];
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    if (horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) {
+      horizontal = Math.abs(mx) > Math.abs(my) * 1.4 && (isOpen() ? mx < 0 : mx > 0);
+      if (!horizontal) { tracking = false; return; }
+      document.body.classList.add("drawer-dragging");
+    }
+    if (!horizontal) return;
+    const w = width();
+    dx = isOpen() ? Math.min(0, mx) : Math.max(0, Math.min(w, mx));
+    const offset = isOpen() ? dx : dx - w;  // pixels from fully open
+    drawer.style.transform = `translateX(${offset}px)`;
+    backdrop.style.opacity = String(1 + offset / w);
+  }, { passive: true });
+
+  document.addEventListener("touchend", () => {
+    if (!tracking) return;
+    tracking = false;
+    if (!horizontal) return;
+    document.body.classList.remove("drawer-dragging");
+    drawer.style.transform = "";
+    backdrop.style.opacity = "";
+    const fast = Math.abs(dx) / Math.max(Date.now() - startTime, 1) > 0.5;
+    const far = Math.abs(dx) > width() * 0.35;
+    if (isOpen()) { if (fast || far) close(); } else if (fast || far) open();
+  });
+})();

@@ -2,9 +2,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core import pwa
+from apps.core.admin_autoregister import register_remaining
+
+register_remaining()
+admin.site.site_header = "NexSpace database"
+admin.site.site_title = "NexSpace database"
+admin.site.index_title = "Every table in NexSpace"
 from apps.notifications.urls import api_urlpatterns as notification_api
 from apps.search.urls import api_urlpatterns as search_api
 
@@ -19,6 +26,7 @@ api_patterns = [
 ]
 
 urlpatterns = [
+    path("admin/", RedirectView.as_view(url="/manage/", permanent=False)),  # people naturally type /admin
     path("django-admin/", admin.site.urls),
     path("api/", include(api_patterns)),
     path("", include("apps.accounts.urls")),
@@ -32,6 +40,7 @@ urlpatterns = [
     path("", include("apps.discover.urls")),
     path("", include("apps.groups.urls")),
     path("", include("apps.manage.urls")),
+    path("", include("apps.manage.platform_urls")),
     path("", include("apps.nexai.urls")),
     path("manifest.webmanifest", pwa.manifest_view, name="manifest"),
     path("sw.js", pwa.service_worker_view, name="service-worker"),
@@ -47,5 +56,6 @@ if settings.DEBUG:
     ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+handler403 = "apps.core.views.error_403"
 handler404 = "apps.core.views.error_404"
 handler500 = "apps.core.views.error_500"

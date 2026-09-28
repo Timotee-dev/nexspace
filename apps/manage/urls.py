@@ -1,11 +1,14 @@
 from django.urls import path
 
-from . import views
+from . import dashboard, views
 
 app_name = "manage"
 
 urlpatterns = [
+    path("dashboard/", dashboard.dashboard_view, name="dashboard"),
     path("manage/", views.overview_view, name="overview"),
+    path("manage/staff/", views.staff_view, name="staff"),
+    path("manage/staff/<int:pk>/", views.staff_decision_view, name="staff-decision"),
     path("manage/users/", views.users_view, name="users"),
     path("manage/users/<int:pk>/", views.user_detail_view, name="user"),
     path("manage/users/<int:pk>/action/", views.user_action_view, name="user-action"),

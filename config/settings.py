@@ -102,7 +102,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 # --- Database -------------------------------------------------------------
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
-    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=not DEBUG)}
+    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True,
+                                                  ssl_require=not DEBUG)}
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 
@@ -146,9 +147,10 @@ STORAGES = {
     },
 }
 
-# Upload limits (Section 39 of the spec)
+# Upload limits (Section 39 of the spec). Cloudinary's free plan rejects files over 10 MB.
 MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
-MAX_DOCUMENT_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_DOCUMENT_MB = int(os.environ.get("MAX_DOCUMENT_MB", "10"))
+MAX_DOCUMENT_UPLOAD_BYTES = MAX_DOCUMENT_MB * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_DOCUMENT_UPLOAD_BYTES + 1024 * 1024
 
 # --- Email ---------------------------------------------------------------
@@ -161,7 +163,12 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "NexSpace <no-reply@ex
 EMAIL_VERIFICATION_MAX_AGE = timedelta(days=3)
 
 # --- Cache (used by login rate limiting) ---------------------------------
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "nexspace"}}
+# With a real database, use it as a shared cache so login lockouts and rate limits hold across
+# all Gunicorn workers. The table is created by a migration (apps/core/migrations/0002).
+if DATABASE_URL:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "nexspace_cache"}}
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "nexspace"}}
 
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCKOUT_SECONDS = 15 * 60
@@ -185,7 +192,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.6.0 (Phases 1–6)",
+    "VERSION": "0.8.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -234,3 +241,16 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 NEXAI_MODEL = os.environ.get("NEXAI_MODEL", "claude-haiku-4-5-20251001").strip()
 NEXAI_DAILY_LIMIT = int(os.environ.get("NEXAI_DAILY_LIMIT", "40"))
 NEXAI_ENABLED = bool(ANTHROPIC_API_KEY)
+
+# Secret for /internal/run-scheduled/ (free alternative to a paid Render cron job).
+CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+
+# --- Platform ownership ------------------------------------------------------
+# These accounts are always platform (super) admins once their email is verified. They can't be
+# demoted, suspended, banned or deleted from inside NexSpace. Override with a comma-separated list.
+PLATFORM_OWNER_EMAILS = [e.lower() for e in env_list("PLATFORM_OWNER_EMAILS", "arifalotimothy@gmail.com")]
+# Who verifies staff sign-ups: "platform" (platform admins only) or "department" (HOD/department admins).
+STAFF_VERIFICATION = os.environ.get("STAFF_VERIFICATION", "platform").strip().lower()
+
+# Stay signed in for 30 days.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30

@@ -6,14 +6,14 @@
 <div class="back-row"><a class="btn btn-quiet" href="{% url 'manage:users' %}"><svg class="icon-sm"><use href="#i-back"/></svg>People</a></div>
 <section class="panel stack">
   <div class="suggest-person">{% include "partials/avatar.html" with person=member size_class="avatar-lg" %}<span><b class="resource-h1">{{ member.full_name }}</b><span class="muted">@{{ member.username }} · {{ member.email }}</span></span></div>
-  <dl class="stat-row">
+  <div class="stat-row">
     <div class="stat"><b>{{ member.level_label|default:"—" }}</b><span>Level</span></div>
     <div class="stat"><b>{{ member.profile.nexscore }}</b><span>NexScore</span></div>
     <div class="stat"><b>{{ stats.posts }}</b><span>posts</span></div>
     <div class="stat"><b>{{ stats.comments }}</b><span>comments</span></div>
     <div class="stat"><b>{{ stats.resources }}</b><span>resources</span></div>
     <div class="stat"><b>{{ stats.reports_against }}</b><span>reports on account</span></div>
-  </dl>
+  </div>
   <p class="small muted">Joined {{ member.date_joined|date:"j M Y" }} · Last active {% if member.last_seen_at %}{{ member.last_seen_at|timesince }} ago{% else %}never{% endif %}{% if member.matric_number %} · Matric {{ member.matric_number }}{% endif %}</p>
   <p class="small">
     {% if not member.is_active %}<span class="tag tag-urgent">Banned</span>{% elif member.is_suspended %}<span class="tag tag-important">Suspended until {{ member.suspended_until|date:"j M, H:i" }}</span>{% endif %}
@@ -26,12 +26,13 @@
   <h2 class="section-title">Roles</h2>
   <ul class="role-list">
     {% for ra in roles %}
-    <li><span><b>{{ ra.get_role_display }}</b> <span class="small muted">{% if ra.course %}{{ ra.course.code }}{% elif ra.department %}{{ ra.department.name }}{% else %}All departments{% endif %}</span></span>
+    <li><span><b>{{ ra.get_role_display }}</b> <span class="small muted">{% if ra.course %}{{ ra.course.code }}{% elif ra.level %}{{ ra.level }} Level{% elif ra.department %}{{ ra.department.name }}{% else %}All departments{% endif %}</span></span>
       <form method="post" action="{% url 'manage:user-action' member.pk %}" data-confirm="Remove this role?">{% csrf_token %}<input type="hidden" name="action" value="revoke_role"><input type="hidden" name="assignment" value="{{ ra.pk }}"><button type="submit" class="btn btn-quiet btn-sm">Remove</button></form></li>
     {% empty %}<li class="muted small">Student (no extra roles).</li>{% endfor %}
   </ul>
   <form method="post" action="{% url 'manage:user-action' member.pk %}" class="form role-form">{% csrf_token %}<input type="hidden" name="action" value="assign_role">
     <div class="form-row two">{% include "partials/field.html" with field=role_form.role %}{% include "partials/field.html" with field=role_form.course %}</div>
+    {% include "partials/field.html" with field=role_form.level %}
     <div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">Assign role</button></div>
   </form>
 </section>

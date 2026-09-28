@@ -71,11 +71,14 @@ def mark_verified(user) -> None:
         user.email_verified = True
         user.email_verified_at = timezone.now()
         user.save(update_fields=["email_verified", "email_verified_at"])
+    from .owner import ensure_owner
+
+    ensure_owner(user)
 
 
 def send_verification_email(user) -> None:
     link = settings.SITE_URL + reverse("accounts:verify-email", args=[make_verification_token(user)])
-    context = {"user": user, "link": link, "days": settings.EMAIL_VERIFICATION_MAX_AGE.days}
+    context = {"user": user, "link": link, "days": settings.EMAIL_VERIFICATION_MAX_AGE.days, "site_url": settings.SITE_URL}
     message = EmailMultiAlternatives(
         subject="Verify your NexSpace email",
         body=render_to_string("emails/verify_email.txt", context),
@@ -89,33 +92,162 @@ def send_verification_email(user) -> None:
 
 
 # --- Roles -----------------------------------------------------------------
-def assign_role(*, user, role, department=None, course=None, granted_by=None):
+COURSE_ROLES = ("course_rep", "lecturer")
+
+
+def assign_role(*, user, role, department=None, course=None, level=None, granted_by=None):
     from .models import RoleAssignment
 
     if course is not None:
-        department = None  # course scope replaces department scope
+        department, level = None, None  # course scope replaces department scope
     assignment, created = RoleAssignment.objects.get_or_create(
-        user=user, role=role, department=department, course=course, defaults={"granted_by": granted_by}
+        user=user, role=role, department=department, course=course, level=level,
+        defaults={"granted_by": granted_by},
     )
     if created:
-        audit(granted_by, "role.assigned", user, role=role,
+        audit(granted_by, "role.assigned", user, role=role, level=level,
               department_id=getattr(department, "pk", None), course_id=getattr(course, "pk", None))
-        if course is not None and role == RoleAssignment.Role.COURSE_REP:
+        if course is not None and role in COURSE_ROLES:
             from apps.spaces.services import sync_course_rep_moderation
 
             sync_course_rep_moderation(user, course, is_rep=True)
     return assignment
 
 
-def revoke_role(*, user, role, department=None, course=None, revoked_by=None) -> bool:
+def revoke_role(*, user, role, department=None, course=None, level=None, revoked_by=None) -> bool:
     from .models import RoleAssignment
 
-    deleted, _ = RoleAssignment.objects.filter(user=user, role=role, department=department, course=course).delete()
+    deleted, _ = RoleAssignment.objects.filter(user=user, role=role, department=department, course=course,
+                                               level=level).delete()
     if deleted:
-        audit(revoked_by, "role.revoked", user, role=role,
+        audit(revoked_by, "role.revoked", user, role=role, level=level,
               department_id=getattr(department, "pk", None), course_id=getattr(course, "pk", None))
-        if course is not None and role == RoleAssignment.Role.COURSE_REP:
+        if course is not None and role in COURSE_ROLES and not RoleAssignment.objects.filter(
+                user=user, course=course, role__in=COURSE_ROLES).exists():
             from apps.spaces.services import sync_course_rep_moderation
 
             sync_course_rep_moderation(user, course, is_rep=False)
     return bool(deleted)
+
+
+# --- Account deletion (right to erasure) -------------------------------------
+@transaction.atomic
+def delete_account(user, *, delete_content=False):
+    """Erase a person's account. Their personal data is removed; what they posted stays under
+    "Deleted user" (so discussions still make sense) unless they ask for it to be deleted too."""
+    from apps.discover.models import OpportunityReminder
+    from apps.groups import services as groups
+    from apps.nexai.models import Usage
+    from apps.notifications.models import Notification, NotificationPreference, PushSubscription
+    from apps.posts.models import Bookmark, Comment, Post
+    from apps.social.models import TopicFollow, UserFollow
+    from apps.spaces import services as spaces
+    from apps.spaces.models import SpaceJoinRequest, SpaceMembership
+
+    from .models import RoleAssignment
+
+    audit(user, "account.deleted", user, delete_content=delete_content)
+    for membership in SpaceMembership.objects.filter(user=user).select_related("space"):
+        spaces.leave(user, membership.space)
+    for membership in user.study_group_memberships.select_related("group"):
+        groups.leave(user=user, group=membership.group)
+    for model, field in ((UserFollow, "follower"), (UserFollow, "following"), (TopicFollow, "user"),
+                         (Bookmark, "user"), (Notification, "recipient"), (NotificationPreference, "user"),
+                         (PushSubscription, "user"), (OpportunityReminder, "user"), (SpaceJoinRequest, "user"),
+                         (RoleAssignment, "user"), (Usage, "user")):
+        model.objects.filter(**{field: user}).delete()
+    if delete_content:
+        Post.objects.filter(author=user).update(is_deleted=True, deleted_at=timezone.now())
+        Comment.objects.filter(author=user).update(is_deleted=True, body="")
+
+    profile = user.profile
+    if profile.avatar:
+        profile.avatar.delete(save=False)
+    profile.avatar = ""
+    profile.bio, profile.skills = "", []
+    profile.github_url = profile.linkedin_url = profile.portfolio_url = ""
+    profile.save()
+    profile.interests.clear()
+
+    user.email = f"deleted-{user.pk}@deleted.invalid"
+    user.username = f"deleted_{user.pk}"
+    user.full_name = "Deleted user"
+    user.matric_number = None
+    user.is_active = False
+    user.email_verified = False
+    user.is_staff = user.is_superuser = False
+    user.set_unusable_password()
+    user.save()
+    from django.contrib.sessions.models import Session
+
+    for session in Session.objects.filter(expire_date__gt=timezone.now()):
+        if session.get_decoded().get("_auth_user_id") == str(user.pk):
+            session.delete()
+
+
+
+# --- Staff ------------------------------------------------------------------
+@transaction.atomic
+def register_staff(*, email, password, full_name, department, position, title="", staff_id="",
+                   courses=(), level=None):
+    """Create a staff account. It starts PENDING: no staff powers until a department admin verifies it."""
+    from .models import StaffProfile, User
+
+    user = User.objects.create_user(email=email, password=password, full_name=full_name.strip(),
+                                    department=department, level=None)
+    staff = StaffProfile.objects.create(user=user, position=position, title=title or "",
+                                        staff_id=(staff_id or "")[:30], requested_level=level)
+    staff.requested_courses.set([c for c in courses if c.department_id == department.pk])
+    audit(user, "staff.requested", user, position=position)
+    from apps.notifications import services as notifications
+
+    notifications.staff_requested(staff)
+    return user
+
+
+def can_verify_staff(admin, staff) -> bool:
+    """settings.STAFF_VERIFICATION = "platform" (default): only platform admins verify staff.
+    "department": the HOD or a department admin of that department can too. Nobody verifies themselves."""
+    from .models import RoleAssignment
+
+    if admin.pk == staff.user_id:
+        return False
+    if admin.is_platform_admin:
+        return True
+    if settings.STAFF_VERIFICATION == "platform":
+        return False
+    return admin.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=staff.user.department)
+
+
+@transaction.atomic
+def verify_staff(*, admin, staff, approve: bool, note=""):
+    """Approve (grant the position's permissions) or reject a staff account."""
+    from django.core.exceptions import PermissionDenied
+
+    from .models import RoleAssignment, StaffProfile
+
+    if not can_verify_staff(admin, staff):
+        raise PermissionDenied("Only the HOD or a department admin can verify staff.")
+    user, dept = staff.user, staff.user.department
+    staff.status = StaffProfile.Status.VERIFIED if approve else StaffProfile.Status.REJECTED
+    staff.decided_by, staff.decided_at, staff.note = admin, timezone.now(), (note or "")[:300]
+    staff.save()
+    if approve:
+        R, P = RoleAssignment.Role, StaffProfile.Position
+        if staff.position == P.HOD:
+            assign_role(user=user, role=R.DEPARTMENT_ADMIN, department=dept, granted_by=admin)
+        elif staff.position == P.EXAM_OFFICER:
+            assign_role(user=user, role=R.EXAM_OFFICER, department=dept, granted_by=admin)
+        elif staff.position == P.LEVEL_ADVISER and staff.requested_level:
+            assign_role(user=user, role=R.LEVEL_ADVISER, department=dept, level=staff.requested_level,
+                        granted_by=admin)
+        elif staff.position == P.LECTURER:
+            for course in staff.requested_courses.all():
+                assign_role(user=user, role=R.LECTURER, course=course, granted_by=admin)
+        if not user.email_verified:  # the HOD vouching for them is at least as strong as an email link
+            mark_verified(user)
+    audit(admin, "staff.verified" if approve else "staff.rejected", user, position=staff.position)
+    from apps.notifications import services as notifications
+
+    notifications.staff_decided(staff)
+    return staff

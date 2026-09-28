@@ -16,7 +16,7 @@ class ResourceUploadForm(forms.Form):
     semester = forms.TypedChoiceField(choices=[("", "Course default"), *Semester.choices], coerce=int,
                                       required=False, empty_value=None)
     description = forms.CharField(max_length=1000, required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    file = forms.FileField(help_text="PDF, Word or PowerPoint, up to 20 MB")
+    file = forms.FileField(help_text="PDF, Word or PowerPoint, up to 10 MB")
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)

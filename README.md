@@ -29,6 +29,8 @@ Demo accounts (password `nexspace-demo-2026`):
 | student@nexspace.test | Student, 300 Level |
 | fresher@nexspace.test | Student, 100 Level, empty profile |
 
+Demo staff (same password): `lecturer@` (Dr. Funmi Adebayo, teaches CSC 301 and 305), `adviser@` (Mr. Kunle Ojo, 300 Level adviser), `exams@` (Mrs. Grace Eze, exam officer), `newstaff@` (a lecturer still waiting for verification); `deptadmin@` is the HOD, Prof. Dele Okafor.
+
 `seed_demo` also creates sample posts of every type, an anonymous question, comments, votes, a poll and follows; 8 courses, department/level/community Spaces, CSC 301 past questions and notes with ratings, announcements (including an expired one) and calendar dates with countdowns. Chioma (rep@) is course rep for CSC 301; Dele (deptadmin@) and Tunde (mod@) can use the moderation queue.
 
 To test the real sign-up flow, create a new account at `/signup/` and copy the verification link from the terminal.
@@ -39,7 +41,7 @@ To test the real sign-up flow, create a new account at `/signup/` and copy the v
 python -m pytest
 ```
 
-150 tests. Phase 6: text extraction from PDF/Word/PowerPoint, indexing on upload and by the scheduled job, retrieval that only ever sees the student's own department's live resources, grounded answers with sources and the student's calendar, refusing to guess when nothing matches, daily limits, summaries, quizzes, past question insights, safe answer rendering and recommendations. Phases 4–5: every notification trigger and audience, preferences and critical bypass, reminders sent exactly once, Web Push encryption (decrypted in the test) and VAPID signatures, expired push subscriptions, grouped search without anonymous leaks or cross-department results, trending, opportunity reminders, study group rules, admin permissions and actions, PWA endpoints, a no-N+1 check on the feed, image resizing and metadata stripping. Phase 3 and moderation: course Spaces, course-rep scope, joining/muting and feeds, resource uploads, ratings, downloads, search and filters, announcement targeting and expiry, publishing permissions, countdowns, reporting rules, auto-hide at 5 reports, removal penalties, suspension, bans, and logged anonymous-author lookups. Phase 1: sign-up, verification, login lockout, password reset, onboarding, profile privacy, avatar validation, role scoping, audit logging. Phase 2: every post type, validation, anonymous authors never leaking (HTML, API, profile, Following tab), vote rules, every NexScore cap, comment depth, polls, department isolation, uploads (including disguised files), rate limits, feed pagination and the API.
+194 tests. Phase 6: text extraction from PDF/Word/PowerPoint, indexing on upload and by the scheduled job, retrieval that only ever sees the student's own department's live resources, grounded answers with sources and the student's calendar, refusing to guess when nothing matches, daily limits, summaries, quizzes, past question insights, safe answer rendering and recommendations. Phases 4–5: every notification trigger and audience, preferences and critical bypass, reminders sent exactly once, Web Push encryption (decrypted in the test) and VAPID signatures, expired push subscriptions, grouped search without anonymous leaks or cross-department results, trending, opportunity reminders, study group rules, admin permissions and actions, PWA endpoints, a no-N+1 check on the feed, image resizing and metadata stripping. Phase 3 and moderation: course Spaces, course-rep scope, joining/muting and feeds, resource uploads, ratings, downloads, search and filters, announcement targeting and expiry, publishing permissions, countdowns, reporting rules, auto-hide at 5 reports, removal penalties, suspension, bans, and logged anonymous-author lookups. Phase 1: sign-up, verification, login lockout, password reset, onboarding, profile privacy, avatar validation, role scoping, audit logging. Phase 2: every post type, validation, anonymous authors never leaking (HTML, API, profile, Following tab), vote rules, every NexScore cap, comment depth, polls, department isolation, uploads (including disguised files), rate limits, feed pagination and the API.
 
 ## What Phase 1 includes
 
@@ -113,6 +115,42 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
   - Questions aren't stored. Only a usage row (who, which feature, token counts) is kept, for limits and the "NexAI requests" figure on the admin dashboard. Conversation history lives in the browser session and "New chat" clears it.
 - **Recommendations**: "For your courses" on the home sidebar (well-rated materials from your courses you haven't downloaded yet) and "People you may know" (classmates who share the most courses with you).
 - **Multiple departments and universities**: every department is fully separate — posts, Spaces, courses, resources, search, NexAI and moderation never cross departments. Super admins add departments at `/manage/departments/` and switch between them in the dashboard.
+
+## Platform owner, platform dashboard and phone drawer (v0.8)
+
+- **Platform owner:** the accounts in `PLATFORM_OWNER_EMAILS` (default `arifalotimothy@gmail.com`) are always platform (super) admins. Rights switch on automatically once the email is **verified** (so nobody can claim them by signing up with that address first), and are restored on every login and every `migrate` if anyone removes them. Nobody else can suspend or ban the owner from inside NexSpace.
+- **Staff verification** is done by platform admins by default (`STAFF_VERIFICATION=platform`). HODs see who is waiting but can't verify; set `STAFF_VERIFICATION=department` to let HODs verify their own staff again.
+- **Platform dashboard at /platform/** (platform admins only):
+  - **Overview:** system health (database, cache, email, file storage, push, NexAI, production mode, when scheduled jobs last ran) with a "Run scheduled jobs now" button; totals across NexSpace; staff to verify; latest activity; every department with members, activity, posts, open reports and pending staff.
+  - **Staff to verify:** every department's staff sign-ups, verify or reject with a reason.
+  - **People:** search every account in every department (name, email, username, matric number), filter by staff, admins, suspended, banned, unverified, no department; jump to manage any of them.
+  - **Activity:** one timeline of sign-ups, posts, comments, uploads, reports, moderation and admin actions, filterable by department and type. Anonymous posts stay anonymous; revealing an author is a separate, logged action.
+  - **Audit log:** every sensitive action in plain English.
+  - **Database:** every table with its row count, each opening in the database admin (/django-admin/) where any row can be searched, edited or deleted. Every model is registered there.
+- **Sign-in lasts 30 days.**
+- **Phones:** the sidebar is hidden and slides in from the left like X — swipe right anywhere (except on horizontally scrolling rows like tabs), or tap your photo in the top bar. Swipe left, tap outside, press Esc or pick a link to close it. The top bar is now just your photo, the logo, search and notifications.
+
+## Staff accounts and dashboards (v0.7)
+
+- **Sign up as staff:** the sign-up form asks "I am a Student / Staff". Staff choose a position — **HOD, Lecturer, Level Adviser or Exam Officer** — a title (Prof., Dr., Mrs. …), an optional staff ID, and lecturers tick the courses they teach, level advisers the level they advise.
+- **Verification first:** a staff account starts *pending*. It works like a normal account but has no staff powers and no badge until the HOD or a department admin verifies it at **/manage/staff/** (or from their dashboard). They get notified either way; a rejection can include a reason. Nobody can verify themselves. In a brand-new department, super admins verify the first HOD.
+- **What each position can do once verified:**
+  - **HOD** → full department admin (everything in /manage/, moderation, verifying staff, announcements to anyone).
+  - **Lecturer** → for their courses: materials published with a "Lecturer" badge, course announcements, test/assignment/exam dates, managing the course Space and approving its members.
+  - **Level Adviser** → their level: announcements and dates for that level, managing the level Space.
+  - **Exam Officer** → exam and test dates for any course or level, department-wide dates and announcements.
+  - Staff can create Spaces. Their name shows with their title and a position badge on posts, comments and their profile, which also lists the courses they teach, their office and office hours (editable in Settings).
+- **Personal dashboard at /dashboard/** — people with a role land there after logging in. It shows a section for every role they hold:
+  - **HOD:** members, weekly activity, posts and open reports; staff waiting to verify (one-click verify); courses with no lecturer or course rep; quick actions.
+  - **Lecturer / course rep:** a card per course (students, materials, downloads in 30 days, unanswered questions, next date) with Upload / Announce / Add a date buttons, plus the questions still waiting for an answer.
+  - **Level adviser:** students in their level on NexSpace, how many verified their email and were active this week, who hasn't verified yet, upcoming dates and active notices.
+  - **Exam officer:** exams and tests in the next 60 days and every course with no exam date yet (with "Add exam").
+  - **Everyone who manages a Space:** people waiting to join. **Moderators:** open reports.
+- Department admins can also give any account these roles by hand in /manage/ → People (lecturer for a course, level adviser for a level, exam officer).
+
+## Audit fixes (v0.6.2)
+
+A full review of the app found and fixed: a privacy leak (profile Replies showed comments from private Spaces), department admins getting "not found" on course announcements, accounts created with `createsuperuser` breaking pages because they had no department (they're now asked for one), a plain-white 403 page, accessibility problems (colour contrast in both themes, unlabelled topic checkboxes, invalid list markup — the key pages now pass automated WCAG 2 AA checks), Word/PowerPoint files losing their extension on Cloudinary, uploads over Cloudinary's free 10 MB limit crashing (now a friendly error and a 10 MB limit), login lockouts and rate limits not being shared across server processes (now a database cache), stale database connections (health checks on). Added: account deletion (Settings → Account), `/privacy/` and `/guidelines/` pages linked from sign-up, the NexSpace logo in emails, a `/admin` shortcut to the dashboard, no offline mode on localhost, and a protected `/internal/run-scheduled/` URL so a free scheduler can replace the paid Render cron job.
 
 ## Deliberately not built yet
 

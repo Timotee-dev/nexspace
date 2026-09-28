@@ -47,9 +47,39 @@ def home_view(request):
     return render(request, "core/home.html", context)
 
 
+def error_403(request, exception=None):
+    return render(request, "errors/403.html", status=403)
+
+
 def error_404(request, exception=None):
     return render(request, "errors/404.html", status=404)
 
 
 def error_500(request):
     return render(request, "errors/500.html", status=500)
+
+
+def run_scheduled_view(request):
+    """Lets a free external scheduler (e.g. cron-job.org) run the scheduled jobs.
+
+    Disabled unless CRON_SECRET is set. Send the secret as `Authorization: Bearer <secret>`
+    or `?token=<secret>`. Returns 404 for a wrong or missing secret, so the URL reveals nothing.
+    """
+    import hmac
+
+    from django.conf import settings
+    from django.core.cache import cache
+    from django.http import Http404, JsonResponse
+
+    secret = settings.CRON_SECRET
+    given = request.headers.get("Authorization", "").removeprefix("Bearer ").strip() or request.GET.get("token", "")
+    if not secret or not hmac.compare_digest(given.encode(), secret.encode()):
+        raise Http404
+    if not cache.add("run-scheduled-lock", 1, 300):  # skip if a previous run is still going
+        return JsonResponse({"status": "already running"})
+    try:
+        from apps.core.scheduled import run_all
+
+        return JsonResponse({"status": "ok", "result": run_all()})
+    finally:
+        cache.delete("run-scheduled-lock")

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}You can't open this page{% endblock %}
+{% block body %}
+<main class="error-page" id="main"><div>
+  <p class="code">403</p>
+  <h1>You don't have access to this page</h1>
+  <p>{% if user.is_authenticated %}It's for people with a particular role, like department admins, moderators or course reps. If you think you should have access, ask your department admin.{% else %}Log in to continue.{% endif %}</p>
+  <a class="btn btn-primary" href="{% if user.is_authenticated %}/{% else %}/login/{% endif %}">{% if user.is_authenticated %}Go to NexSpace home{% else %}Log in{% endif %}</a>
+</div></main>
+{% endblock %}

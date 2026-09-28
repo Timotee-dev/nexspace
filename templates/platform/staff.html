@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}Staff to verify · Platform{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "platform/_nav.html" %}
+<p class="small muted">Only verify people you know hold that position. HOD → full admin of their department; Lecturer → their courses; Level Adviser → their level; Exam Officer → exam and test dates across their department.</p>
+<div class="stack" style="margin-top:12px">{% include "platform/_pending.html" with pending=pending compact=False %}</div>
+<section style="margin-top:28px"><h2 class="section-title">Recent decisions</h2>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Person</th><th scope="col">Position</th><th scope="col">Decision</th><th scope="col">By</th></tr></thead><tbody>
+  {% for s in recent %}<tr><td>{{ s.user.full_name }}<br><span class="small muted">{{ s.user.department.name }}</span></td><td>{{ s.get_position_display }}</td><td>{{ s.get_status_display }}{% if s.note %}<br><span class="small muted">"{{ s.note }}"</span>{% endif %}</td><td class="small">{{ s.decided_by.full_name|default:"—" }}<br>{{ s.decided_at|date:"j M Y" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

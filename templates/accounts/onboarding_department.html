@@ -1,0 +1,17 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Choose your department{% endblock %}
+{% block card %}
+<header>
+  <h1>Which department are you in?</h1>
+  <p>Everything on NexSpace — posts, Spaces, courses and admin — belongs to a department.</p>
+</header>
+{% if not form.fields.department.queryset.exists %}
+<div class="form-errors" role="alert">No departments exist yet. Run <code>python manage.py bootstrap_institution</code> first (see DEPLOY.md).</div>
+{% endif %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/field.html" with field=form.department %}
+  {% include "partials/field.html" with field=form.level %}
+  <button type="submit" class="btn btn-primary btn-block">Continue</button>
+</form>
+{% endblock %}

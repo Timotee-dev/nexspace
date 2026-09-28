@@ -10,19 +10,42 @@
 {% if not form.fields.department.queryset.exists %}
 <div class="form-errors" role="alert">Sign-up isn't open yet: no departments have been set up. An administrator needs to add one first.</div>
 {% endif %}
-<form method="post" class="form" novalidate>
+<form method="post" class="form signup-form" novalidate>
   {% csrf_token %}
+  <fieldset class="kind-picker account-type">
+    <legend class="field-label" style="margin-bottom:8px">I am a</legend>
+    {% for radio in form.account_type %}<label class="kind-option">{{ radio.tag }}<span>{% if radio.data.value == "staff" %}Staff{% else %}Student{% endif %}</span></label>{% endfor %}
+  </fieldset>
+  <p class="field-help staff-only">For HODs, lecturers, level advisers and exam officers. Your HOD or department admin verifies staff accounts before staff features switch on.</p>
   {% include "partials/field.html" with field=form.full_name %}
   {% include "partials/field.html" with field=form.email %}
-  <div class="form-row two">
-    {% include "partials/field.html" with field=form.department %}
-    {% include "partials/field.html" with field=form.level %}
+  {% include "partials/field.html" with field=form.department %}
+  <div class="student-only">
+    <div class="form-row two">
+      {% include "partials/field.html" with field=form.level %}
+      {% include "partials/field.html" with field=form.matric_number optional=True %}
+    </div>
   </div>
-  {% include "partials/field.html" with field=form.matric_number optional=True %}
+  <div class="staff-only stack">
+    <div class="form-row two">
+      {% include "partials/field.html" with field=form.position %}
+      {% include "partials/field.html" with field=form.title %}
+    </div>
+    <div class="lecturer-only">
+      <fieldset class="field"><legend>{{ form.courses.label }}</legend>
+        <p class="field-help">Pick courses from the department you chose above.</p>
+        <div class="course-picks">{% for c in form.courses %}<label class="choice" data-dept="{{ c.data.value.instance.department_id }}">{{ c.tag }}<span class="choice-text">{{ c.choice_label }}</span></label>{% endfor %}</div>
+        {% for error in form.courses.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </fieldset>
+    </div>
+    <div class="adviser-only">{% include "partials/field.html" with field=form.adviser_level %}</div>
+    {% include "partials/field.html" with field=form.staff_id optional=True %}
+  </div>
   <div class="form-row two">
     {% include "partials/field.html" with field=form.password %}
     {% include "partials/field.html" with field=form.confirm_password %}
   </div>
+  <p class="field-help">By creating an account you agree to the <a href="{% url 'core:guidelines' %}" target="_blank">community guidelines</a> and the <a href="{% url 'core:privacy' %}" target="_blank">privacy notice</a>.</p>
   <button type="submit" class="btn btn-primary btn-block">Create account</button>
 </form>
 <p class="auth-foot">Already on NexSpace? <a href="{% url 'accounts:login' %}">Log in</a></p>

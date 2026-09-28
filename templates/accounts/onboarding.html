@@ -17,7 +17,7 @@
     <legend class="visually-hidden">Interests</legend>
     <ul class="chips">
       {% for choice in form.interests %}
-      <li class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></li>
+      <li><label class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label></li>
       {% endfor %}
     </ul>
   </fieldset>

@@ -9,18 +9,47 @@ from apps.posts.services import require_verified
 from .models import AcademicEvent, Announcement, Audience
 
 
-def can_publish(user, *, audience, target_course=None) -> bool:
-    """Department admins can target anything; course reps only their own courses."""
-    if user.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=user.department):
+def publish_scope(user):
+    """What a user may publish announcements and calendar dates to.
+
+    HOD / department admin: anything. Exam officer: the department, any level, any course.
+    Level adviser: their level(s). Lecturer / course rep: their courses.
+    """
+    from apps.academics.models import Course, Level
+
+    R = RoleAssignment.Role
+    dept = user.department
+    assignments = user.role_assignments.all()
+    is_admin = user.has_role(R.DEPARTMENT_ADMIN, department=dept)
+    is_exam = is_admin or assignments.filter(role=R.EXAM_OFFICER, department=dept).exists()
+    if is_exam:
+        courses = set(Course.objects.filter(department=dept, is_active=True).values_list("pk", flat=True))
+    else:
+        courses = set(assignments.filter(role__in=[R.COURSE_REP, R.LECTURER], course__isnull=False)
+                      .values_list("course_id", flat=True))
+    if is_exam:
+        levels = {value for value, _ in Level.choices}
+    else:
+        levels = set(assignments.filter(role=R.LEVEL_ADVISER, department=dept).values_list("level", flat=True))
+    return {"admin": is_admin, "department": is_exam, "spaces": is_admin, "courses": courses, "levels": levels}
+
+
+def can_publish(user, *, audience, target_course=None, target_level=None) -> bool:
+    scope = publish_scope(user)
+    if scope["admin"]:
         return True
-    return audience == Audience.COURSE and target_course is not None and user.has_role(
-        RoleAssignment.Role.COURSE_REP, course=target_course
-    )
+    if audience == Audience.DEPARTMENT:
+        return scope["department"]
+    if audience == Audience.LEVEL:
+        return target_level in scope["levels"]
+    if audience == Audience.COURSE:
+        return target_course is not None and target_course.pk in scope["courses"]
+    return False
 
 
 def is_publisher(user) -> bool:
-    return user.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=user.department) or \
-        user.role_assignments.filter(role=RoleAssignment.Role.COURSE_REP, course__isnull=False).exists()
+    scope = publish_scope(user)
+    return bool(scope["admin"] or scope["department"] or scope["courses"] or scope["levels"])
 
 
 def _validate_target(user, audience, target_level, target_course, target_space):
@@ -32,7 +61,7 @@ def _validate_target(user, audience, target_level, target_course, target_space):
         raise ValidationError("Choose a course in your department.")
     if audience == Audience.SPACE and (target_space is None or target_space.department_id != user.department_id):
         raise ValidationError("Choose a Space in your department.")
-    if not can_publish(user, audience=audience, target_course=target_course):
+    if not can_publish(user, audience=audience, target_course=target_course, target_level=target_level):
         raise PermissionDenied("You don't have permission to publish to that audience.")
     return {
         "department_id": user.department_id, "audience": audience,

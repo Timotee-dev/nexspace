@@ -31,6 +31,15 @@
     <noscript>Use your browser's "Add to Home Screen" option.</noscript>
   </section>
 
+  <form method="post" action="{% url 'accounts:delete-account' %}" class="panel form danger-zone" data-confirm="Delete your NexSpace account permanently? This can't be undone.">
+    {% csrf_token %}
+    <h2 class="section-title">Delete your account</h2>
+    <p class="small muted">This permanently removes your name, email, photo, profile, follows, Space and group memberships, saved posts and notifications. Your posts and comments stay under "Deleted user" so conversations still make sense — tick the box to delete them too. See the <a href="{% url 'core:privacy' %}">privacy notice</a>.</p>
+    <label class="toggle-row" for="delete_content"><span>Also delete my posts and comments</span><span class="switch"><input type="checkbox" id="delete_content" name="delete_content"><span></span></span></label>
+    <div class="field"><label for="delete-password">Your password</label><div class="password-wrap"><input type="password" id="delete-password" name="password" autocomplete="current-password" required><button type="button" class="icon-btn" data-reveal aria-label="Show password" aria-pressed="false"><svg class="icon-sm"><use href="#i-eye"/></svg></button></div></div>
+    <div class="form-actions"><button type="submit" class="btn btn-danger">Delete my account</button></div>
+  </form>
+
   <form method="post" action="{% url 'accounts:logout' %}" class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     {% csrf_token %}
     <p>Log out of NexSpace on this device.</p>

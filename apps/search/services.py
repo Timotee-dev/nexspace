@@ -63,7 +63,7 @@ def search(user, q, *, only=None, limit=5):
                                  .filter(_all_words(words, "name", "description", "course__code"))
                                  .order_by("-is_official", "-member_count")[:limit])
     if want("resources"):
-        results["resources"] = list(Resource.objects.for_viewer(user).select_related("course", "session")
+        results["resources"] = list(Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
                                     .filter(_all_words(words, "title", "description", "course__code", "course__title"))
                                     .order_by("-download_count")[:limit])
     base_posts = Post.objects.for_viewer(user).with_related()

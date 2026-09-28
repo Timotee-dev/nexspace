@@ -3,7 +3,7 @@ from django.urls import reverse
 
 ALLOWED_PREFIXES = (
     "/onboarding/", "/logout/", "/verify-email/", "/password-reset/",
-    "/static/", "/media/", "/api/", "/django-admin/",
+    "/static/", "/media/", "/api/", "/django-admin/", "/privacy/", "/guidelines/", "/internal/",
 )
 
 
@@ -18,10 +18,12 @@ class OnboardingMiddleware:
         if (
             user is not None
             and user.is_authenticated
-            and not user.onboarding_completed
             and not request.path.startswith(ALLOWED_PREFIXES)
         ):
-            return redirect(reverse("accounts:onboarding"))
+            if user.department_id is None:
+                return redirect(reverse("accounts:onboarding") + "?step=department")
+            if not user.onboarding_completed:
+                return redirect(reverse("accounts:onboarding"))
         return self.get_response(request)
 
 

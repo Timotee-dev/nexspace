@@ -10,7 +10,7 @@
       {% else %}{% include "partials/follow_button.html" with kind="user" key=profile_user.username following=is_following %}{% endif %}
     </div>
     <div class="profile-name">
-      <h1 id="profile-name">{{ profile_user.full_name }}</h1>
+      <h1 id="profile-name">{{ profile_user.display_name }}{% if staff %} <span class="tag tag-staff">{{ staff.get_position_display }}</span>{% endif %}</h1>
       <p>@{{ profile_user.username }}</p>
     </div>
     <div class="profile-meta">
@@ -19,6 +19,11 @@
       {% if show_matric %}<span><svg class="icon-sm"><use href="#i-lock"/></svg>{{ profile_user.matric_number }}{% if is_owner and not profile.show_matric_number %} (only you){% endif %}</span>{% endif %}
     </div>
     {% if not is_owner %}<p class="small" style="margin-top:8px"><a class="muted" href="{% url 'moderation:report' 'user' profile_user.pk %}?next={{ request.get_full_path|urlencode }}">Report account</a></p>{% endif %}
+    {% if staff %}<div class="staff-info small">
+      {% if taught %}<p>Teaches {% for ra in taught %}<a href="{{ ra.course.get_absolute_url }}">{{ ra.course.code }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+      {% if staff.office %}<p>Office: {{ staff.office }}</p>{% endif %}
+      {% if staff.office_hours %}<p>Office hours: {{ staff.office_hours }}</p>{% endif %}
+    </div>{% endif %}
     {% if profile.bio %}<p class="profile-bio">{{ profile.bio }}</p>{% endif %}
     <p class="follow-counts"><span><b>{{ following_count }}</b> following</span><span><b data-follower-count>{{ follower_count }}</b> follower{{ follower_count|pluralize }}</span></p>
     <p style="margin-top:12px"><span class="nexscore" title="NexScore grows as you help others with answers and resources"><b>{{ profile.nexscore }}</b> NexScore</span></p>

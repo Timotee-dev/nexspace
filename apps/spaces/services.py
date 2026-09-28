@@ -14,9 +14,10 @@ def can_create_space(user) -> bool:
 
     if not user.is_authenticated or not user.department_id:
         return False
-    return user.has_role(RoleAssignment.Role.COURSE_REP) or user.has_role(
-        RoleAssignment.Role.MODERATOR, department=user.department
-    )
+    R = RoleAssignment.Role
+    return (user.has_role(R.COURSE_REP)  # includes lecturers and department admins / HOD
+            or user.has_role(R.MODERATOR, department=user.department)
+            or user.role_assignments.filter(role__in=[R.LEVEL_ADVISER, R.EXAM_OFFICER]).exists())
 
 
 def is_member(user, space) -> bool:
@@ -179,6 +180,9 @@ def can_manage(user, space) -> bool:
     from apps.accounts.models import RoleAssignment
 
     if space.course_id and user.has_role(RoleAssignment.Role.COURSE_REP, course=space.course):
+        return True  # course reps and the course's lecturers
+    if space.kind == Space.Kind.LEVEL and space.level and user.has_role(
+            RoleAssignment.Role.LEVEL_ADVISER, department=space.department, level=space.level):
         return True
     if user.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=space.department):
         return True

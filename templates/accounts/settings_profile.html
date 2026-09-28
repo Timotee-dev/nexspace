@@ -22,10 +22,18 @@
     {% include "partials/field.html" with field=form.full_name %}
     {% include "partials/field.html" with field=form.username %}
   </div>
+  {% if form.level %}
   <div class="form-row two">
     {% include "partials/field.html" with field=form.level %}
     {% include "partials/field.html" with field=form.matric_number optional=True %}
   </div>
+  {% endif %}
+  {% if staff_form %}
+  <h2 class="section-title">Staff details <span class="tag tag-staff">{{ user.staff.get_position_display }}{% if user.staff.status != "verified" %} · {{ user.staff.get_status_display|lower }}{% endif %}</span></h2>
+  <div class="form-row two">{% include "partials/field.html" with field=staff_form.title %}{% include "partials/field.html" with field=staff_form.staff_id optional=True %}</div>
+  {% include "partials/field.html" with field=staff_form.office optional=True %}
+  {% include "partials/field.html" with field=staff_form.office_hours optional=True %}
+  {% endif %}
   <div class="field{% if form.bio.errors %} has-error{% endif %}">
     <label for="{{ form.bio.id_for_label }}">Bio <span class="optional">(optional)</span></label>
     <textarea name="bio" id="{{ form.bio.id_for_label }}" rows="3" maxlength="280" data-count="bio-count">{{ form.bio.value|default:"" }}</textarea>

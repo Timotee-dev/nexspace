@@ -83,14 +83,14 @@
   <div class="attach-row">
     <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-image"/></svg>Images<input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-attach="images" aria-label="Add images (up to 4)"></label>
     <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-file"/></svg>Files<input type="file" name="files" accept=".pdf,.doc,.docx,.ppt,.pptx" multiple data-attach="files" aria-label="Add PDF, Word or PowerPoint files (up to 3)"></label>
-    <span class="muted small">Up to 4 images (5 MB each) and 3 files (20 MB each)</span>
+    <span class="muted small">Up to 4 images (5 MB each) and 3 files (10 MB each)</span>
   </div>
   <ul class="attach-preview" data-attach-preview aria-live="polite"></ul>
 
   <fieldset class="field">
     <legend>Topics <span class="optional">(up to 3)</span></legend>
     <ul class="chips" data-max-topics="3">
-      {% for choice in form.topics %}<li class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></li>{% endfor %}
+      {% for choice in form.topics %}<li><label class="chip">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label></li>{% endfor %}
     </ul>
     {% for error in form.topics.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
   </fieldset>

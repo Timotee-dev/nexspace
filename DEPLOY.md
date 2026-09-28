@@ -48,6 +48,9 @@ Dashboard → copy the **API environment variable** (`cloudinary://...`). That's
 | `CSRF_TRUSTED_ORIGINS` | `https://your-app.onrender.com,https://yourdomain.com` |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | from step 1 (`VAPID_SUBJECT=mailto:you@yourdomain`) |
 | `ANTHROPIC_API_KEY` | optional — turns on NexAI's written answers |
+| `CRON_SECRET` | optional — enables the free scheduler URL (section 5b) |
+| `PLATFORM_OWNER_EMAILS` | optional — defaults to `arifalotimothy@gmail.com`; comma-separate to add more owners |
+| `STAFF_VERIFICATION` | optional — `platform` (default: you verify all staff) or `department` (HODs verify) |
 
 `SECRET_KEY` is generated for you. `DEBUG` is already `False`.
 
@@ -55,12 +58,28 @@ Dashboard → copy the **API environment variable** (`cloudinary://...`). That's
 
 4. Deploy. The build runs `collectstatic` and `migrate` automatically.
 
+## 5b. Scheduled jobs for free (cron-job.org)
+
+Render cron jobs cost at least $1/month. Instead, let a free scheduler call NexSpace every 15 minutes:
+
+1. Add an environment variable to the web service: `CRON_SECRET` = a long random string (e.g. from Render's **Generate** button). Save.
+2. Create a free account at **cron-job.org** → **Create cronjob**:
+   - URL: `https://your-app.onrender.com/internal/run-scheduled/`
+   - Schedule: every 15 minutes
+   - Advanced → Headers → add `Authorization` with the value `Bearer <your CRON_SECRET>`
+   - Save, then use **Test run**. You should get `{"status": "ok", ...}`.
+3. If you use this, delete the `- type: cron` block from `render.yaml` (or don't create the cron job).
+
+This sends exam and deadline reminders, delivers push notifications, reads new uploads for NexAI and recomputes trending. The URL returns "not found" to anyone without the secret. On the free plan the first call after a quiet period may time out while the server wakes up; the next one works.
+
 ## 6. First-time setup (Render → web service → Shell)
 
 ```bash
 python manage.py bootstrap_institution --university "University of Medical Sciences, Ondo" --short UNIMED --faculty "Faculty of Computing" --department "Computer Science" --code CSC
 python manage.py createsuperuser
 ```
+
+Easier: just sign up on the live site with `arifalotimothy@gmail.com` and click the verification email. That account becomes the platform admin automatically, so you don't need `createsuperuser` at all.
 
 Then log in, and in `/manage/`:
 
@@ -84,9 +103,16 @@ Render → Settings → Custom domains → add it, then create the CNAME/A recor
 - `/manifest.webmanifest` loads and Chrome offers "Install app".
 - Render → cron job → Logs shows `Done: {...}` every 15 minutes.
 
-## 9. Keep it safe
+## 9. Free-plan limits to know
+
+- **Render free** sleeps after 15 minutes without visitors; the next visit takes about a minute.
+- **Supabase free** pauses a project after about a week with no activity. Restore it from the Supabase dashboard; your data is kept. The every-15-minutes scheduler above counts as activity.
+- **Cloudinary free** rejects files over 10 MB, so NexSpace limits uploads to 10 MB. On a paid Cloudinary plan, raise it with `MAX_DOCUMENT_MB=20`.
+- Login lockouts and rate limits are stored in the database (a cache table created automatically by `migrate`), so they work across all server processes.
+
+## 10. Keep it safe
 
 - Supabase: turn on daily backups (Pro plan) or schedule `pg_dump` exports.
 - Render: add a health check path of `/` and set up an alert email for failed deploys.
 - Rotate `BREVO_API_KEY`, `CLOUDINARY_URL`, `ANTHROPIC_API_KEY` and the database password if anyone who had them leaves.
-- Publish community rules and a privacy notice before inviting students (what's stored, what "anonymous" means, how reports work).
+- Review and edit `templates/core/privacy.html` and `templates/core/guidelines.html` (live at `/privacy/` and `/guidelines/`) before inviting students — add your contact details and your department's own rules.

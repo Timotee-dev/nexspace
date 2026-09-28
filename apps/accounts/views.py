@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -33,17 +34,22 @@ def signup_view(request):
     form = SignupForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
-        user = services.register_user(
-            email=data["email"],
-            password=data["password"],
-            full_name=data["full_name"],
-            department=data["department"],
-            level=data["level"],
-            matric_number=data["matric_number"],
-        )
+        if data["account_type"] == "staff":
+            user = services.register_staff(
+                email=data["email"], password=data["password"], full_name=data["full_name"],
+                department=data["department"], position=data["position"], title=data["title"],
+                staff_id=data["staff_id"], courses=data.get("courses") or [], level=data.get("adviser_level"),
+            )
+            note = " Your HOD or department admin will verify your staff account; you'll be notified."
+        else:
+            user = services.register_user(
+                email=data["email"], password=data["password"], full_name=data["full_name"],
+                department=data["department"], level=data["level"], matric_number=data["matric_number"],
+            )
+            note = ""
         services.send_verification_email(user)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        messages.success(request, f"Account created. We sent a verification link to {user.email}.")
+        messages.success(request, f"Account created. We sent a verification link to {user.email}.{note}")
         return redirect("accounts:onboarding")
     return render(request, "accounts/signup.html", {"form": form})
 
@@ -61,7 +67,9 @@ def login_view(request):
         elif form.is_valid():
             ratelimit.clear_failures(request, email)
             login(request, form.user)
-            return redirect(_safe_next(request, reverse("core:home")))
+            landing = reverse("manage:dashboard") if form.user.has_dashboard and form.user.onboarding_completed \
+                else reverse("core:home")
+            return redirect(_safe_next(request, landing))
         else:
             ratelimit.record_failure(request, email)
             locked = ratelimit.is_locked(request, email)
@@ -103,10 +111,31 @@ def resend_verification_view(request):
 ONBOARDING_STEPS = ["interests", "level", "spaces"]
 
 
+class DepartmentForm(forms.Form):
+    department = forms.ModelChoiceField(queryset=None, empty_label="Choose your department")
+    level = forms.TypedChoiceField(choices=[], coerce=int)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.academics.models import Department, Level
+
+        self.fields["department"].queryset = Department.objects.filter(is_active=True).select_related("faculty__university")
+        self.fields["level"].choices = Level.choices
+
+
 @login_required
 def onboarding_view(request):
     user = request.user
     step = request.GET.get("step", "interests")
+    if user.department_id is None or step == "department":
+        # Accounts created without a department (e.g. with createsuperuser) pick one first.
+        form = DepartmentForm(request.POST or None, initial={"level": user.level})
+        if request.method == "POST" and form.is_valid():
+            user.department = form.cleaned_data["department"]
+            user.level = form.cleaned_data["level"]
+            user.save(update_fields=["department", "level"])
+            return redirect("core:home" if user.onboarding_completed else "accounts:onboarding")
+        return render(request, "accounts/onboarding_department.html", {"form": form})
     if step not in ONBOARDING_STEPS:
         step = "interests"
     step_number = ONBOARDING_STEPS.index(step) + 1
@@ -117,7 +146,8 @@ def onboarding_view(request):
         )
         if request.method == "POST" and form.is_valid():
             user.profile.interests.set(form.cleaned_data["interests"])
-            return redirect(f"{reverse('accounts:onboarding')}?step=level")
+            next_step = "spaces" if user.staff else "level"  # staff don't belong to a level
+            return redirect(f"{reverse('accounts:onboarding')}?step={next_step}")
     elif step == "level":
         form = LevelForm(request.POST or None, initial={"level": user.level})
         if request.method == "POST" and form.is_valid():
@@ -128,15 +158,23 @@ def onboarding_view(request):
         from apps.spaces import services as space_services
         from apps.spaces.models import Space
 
+        match = Q(kind__in=["department", "community"])
+        if user.level:
+            match |= Q(level=user.level)
+        if user.staff:
+            match |= Q(course__in=user.staff.requested_courses.all())
+            if user.staff.requested_level:
+                match |= Q(kind="level", level=user.staff.requested_level)
         suggested = list(
-            Space.objects.filter(department_id=user.department_id)
-            .filter(Q(kind__in=["department", "community"]) | Q(level=user.level))
+            Space.objects.filter(department_id=user.department_id).filter(match)
             .select_related("course").order_by("kind", "name")[:40]
         )
         joined = space_services.joined_space_ids(user)
         pending = space_services.pending_request_ids(user)
+        staff_courses = set(user.staff.requested_courses.values_list("pk", flat=True)) if user.staff else set()
         preselect = {s.pk for s in suggested if s.pk in joined or s.pk in pending
-                     or s.kind in ("department", "level") or (s.kind == "course" and s.level == user.level)}
+                     or s.kind in ("department", "level") or (s.kind == "course" and s.level == user.level)
+                     or s.course_id in staff_courses}
         if request.method == "POST":
             chosen = {int(i) for i in request.POST.getlist("spaces") if i.isdigit()}
             requested = 0
@@ -205,6 +243,9 @@ def profile_detail_view(request, username):
         "follower_count": profile_user.follower_set.count(),
         "following_count": profile_user.following_set.count(),
         "is_following": UserFollow.objects.filter(follower=request.user, following=profile_user).exists(),
+        "staff": profile_user.staff if profile_user.is_verified_staff else None,
+        "taught": list(profile_user.role_assignments.filter(role="lecturer").select_related("course"))
+        if profile_user.is_verified_staff else [],
     }
     if tab == "posts":
         posts = Post.objects.for_viewer(request.user).with_related().filter(author=profile_user)
@@ -212,27 +253,42 @@ def profile_detail_view(request, username):
             posts = posts.filter(is_anonymous=False)  # anonymous posts never appear on a public profile
         context["posts"] = list(annotate_for_user(posts, request.user)[:30])
     elif tab == "replies":
+        visible_posts = Post.objects.for_viewer(request.user).values("pk")  # respects private Spaces
         context["replies"] = list(
-            Comment.objects.filter(
-                author=profile_user, is_deleted=False, post__is_deleted=False,
-                post__department_id=request.user.department_id,
-            ).select_related("post").order_by("-created_at")[:30]
+            Comment.objects.filter(author=profile_user, is_deleted=False, is_hidden=False, post__in=visible_posts)
+            .select_related("post").order_by("-created_at")[:30]
         )
     return render(request, "profiles/detail.html", context)
+
+
+class StaffDetailsForm(forms.ModelForm):
+    class Meta:
+        from .models import StaffProfile
+
+        model = StaffProfile
+        fields = ["title", "office", "office_hours", "staff_id"]
+        labels = {"office_hours": "Office hours", "staff_id": "Staff ID"}
+        help_texts = {"office_hours": "e.g. Tuesdays 10am–12pm", "office": "e.g. Room 12, Computing building"}
 
 
 @login_required
 def settings_profile_view(request):
     user = request.user
+    staff = user.staff
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, user=user)
-        if form.is_valid():
+        staff_form = StaffDetailsForm(request.POST, instance=staff, prefix="staff") if staff else None
+        if form.is_valid() and (staff_form is None or staff_form.is_valid()):
             form.save()
+            if staff_form:
+                staff_form.save()
             messages.success(request, "Profile saved.")
             return redirect("accounts:settings-profile")
     else:
         form = ProfileForm(initial=ProfileForm.initial_for(user), user=user)
-    return render(request, "accounts/settings_profile.html", {"form": form, "section": "profile"})
+        staff_form = StaffDetailsForm(instance=staff, prefix="staff") if staff else None
+    return render(request, "accounts/settings_profile.html", {"form": form, "staff_form": staff_form,
+                                                              "section": "profile"})
 
 
 @login_required
@@ -268,3 +324,21 @@ def settings_account_view(request):
         "accounts/settings_account.html",
         {"appearance": appearance, "password_form": password_form, "section": "account"},
     )
+
+
+@login_required
+@require_POST
+def delete_account_view(request):
+    from django.contrib.auth import authenticate
+
+    user = request.user
+    if user.is_superuser:
+        messages.error(request, "Super admin accounts can't be deleted here. Remove the super admin role first.")
+        return redirect("accounts:settings-account")
+    if authenticate(request, email=user.email, password=request.POST.get("password", "")) is None:
+        messages.error(request, "That password isn't right. Your account was not deleted.")
+        return redirect("accounts:settings-account")
+    services.delete_account(user, delete_content=request.POST.get("delete_content") == "on")
+    logout(request)
+    messages.success(request, "Your account has been deleted. Thanks for being part of NexSpace.")
+    return redirect("core:home")

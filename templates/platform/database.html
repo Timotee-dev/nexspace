@@ -1,0 +1,10 @@
+{% extends "layouts/app.html" %}
+{% block title %}Database · Platform{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "platform/_nav.html" %}
+<div class="banner"><p><b>Direct database access.</b> Each table opens in the database admin, where you can search, filter, add, edit and delete any row. Changes there skip NexSpace's safety rules (notifications, NexScore, audit logging), so prefer the normal screens for everyday work.</p></div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Area</th><th scope="col">Table</th><th scope="col">Rows</th><th scope="col"></th></tr></thead><tbody>
+{% for t in tables %}<tr><td class="small muted">{{ t.app }}</td><td>{{ t.name }}</td><td>{{ t.count }}</td><td>{% if t.url %}<a href="{{ t.url }}">Open</a>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Privacy notice{% endblock %}
+{% block robots %}<meta name="robots" content="index, follow">{% endblock %}
+{% block body %}
+{# Edit this page before launch: add your contact details and have your department or university review it. #}
+<main class="legal" id="main">
+  <a class="wordmark" href="/"><span class="wordmark-glyph">N</span>NexSpace</a>
+  <h1>Privacy notice</h1>
+  <p class="muted">What NexSpace stores about you, why, and what you can do about it.</p>
+
+  <h2>What we store</h2>
+  <ul>
+    <li><b>Your account:</b> name, email, department, level, password (stored as a one-way hash we can't read), and your matric number if you add it.</li>
+    <li><b>Your profile:</b> photo, bio, skills, links and interests — only what you choose to add.</li>
+    <li><b>What you do on NexSpace:</b> posts, comments, votes, polls, uploads, ratings, follows, saved posts, Space and study group memberships, and reports you make.</li>
+    <li><b>Technical data:</b> when you were last active (for department-level counts), and a browser key if you turn on push notifications.</li>
+    <li><b>NexAI:</b> your questions are <b>not</b> stored. We only count how many you ask, to apply the daily limit.</li>
+  </ul>
+
+  <h2>Who can see it</h2>
+  <ul>
+    <li>Your posts and profile are visible to people in <b>your department</b> only. You can limit your profile further in Settings → Privacy. Nothing is public on the internet.</li>
+    <li>Posts in 🔒 private Spaces are visible to that Space's approved members only.</li>
+    <li><b>Anonymous posts</b> show "Anonymous Student" to everyone else. Department moderators can see who wrote one if it's reported for abuse; every such lookup is logged.</li>
+    <li>Department admins can see account details (not passwords) to manage the platform. Analytics show counts only, never individual browsing.</li>
+  </ul>
+
+  <h2>Services we use</h2>
+  <p>NexSpace runs on Render (hosting) and Supabase (database), stores files on Cloudinary, sends email through Brevo, and — if switched on — sends course material excerpts to Anthropic to write NexAI answers. They process data only to provide those services.</p>
+
+  <h2>Your rights</h2>
+  <ul>
+    <li>Edit or remove your profile information at any time in Settings.</li>
+    <li>Delete your account in <b>Settings → Account</b>. Your personal details are erased; your posts stay under "Deleted user" unless you choose to delete them too.</li>
+    <li>Ask for a copy of your data or raise a concern by contacting the NexSpace team or your department admin.</li>
+  </ul>
+  <p class="small muted">Last updated {% now "F Y" %}.</p>
+  <p><a href="{% url 'core:guidelines' %}">Community guidelines</a> · <a href="/">NexSpace home</a></p>
+</main>
+{% endblock %}

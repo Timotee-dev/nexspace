@@ -10,6 +10,7 @@
 <nav class="settings-nav" aria-label="Admin sections">
   <a href="{% url 'manage:overview' %}" {% if section == "overview" %}aria-current="page"{% endif %}>Overview</a>
   <a href="{% url 'manage:users' %}" {% if section == "users" %}aria-current="page"{% endif %}>People</a>
+  <a href="{% url 'manage:staff' %}" {% if section == "staff" %}aria-current="page"{% endif %}>Staff</a>
   <a href="{% url 'manage:courses' %}" {% if section == "courses" %}aria-current="page"{% endif %}>Courses</a>
   <a href="{% url 'manage:sessions' %}" {% if section == "sessions" %}aria-current="page"{% endif %}>Sessions</a>
   <a href="{% url 'manage:spaces' %}" {% if section == "spaces" %}aria-current="page"{% endif %}>Spaces</a>

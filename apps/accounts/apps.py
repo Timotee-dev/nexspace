@@ -7,4 +7,9 @@ class AccountsConfig(AppConfig):
     label = "accounts"
 
     def ready(self):
+        from django.db.models.signals import post_migrate
+
         from . import signals  # noqa: F401
+        from .owner import ensure_all_owners
+
+        post_migrate.connect(ensure_all_owners, sender=self)

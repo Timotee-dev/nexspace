@@ -42,7 +42,7 @@ def explore_view(request):
         "courses": list(Course.objects.filter(department_id=user.department_id, level=user.level, is_active=True)
                         .exclude(pk__in=joined_course_ids(user))[:6]),
         "opportunities": list(services.opportunities(user)[:4]),
-        "resources": list(Resource.objects.for_viewer(user).select_related("course", "session")
+        "resources": list(Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
                           .order_by("-download_count", "-created_at")[:5]),
         "people": list(User.objects.filter(department_id=user.department_id, is_active=True)
                        .exclude(pk__in=followed | {user.pk}).select_related("profile")

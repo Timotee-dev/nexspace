@@ -6,7 +6,7 @@
     <p class="small resource-meta">
       {% if resource.rating_count %}<span>★ {{ resource.rating_avg }} ({{ resource.rating_count }})</span>{% else %}<span class="muted">No ratings yet</span>{% endif %}
       <span class="muted">{{ resource.download_count }} download{{ resource.download_count|pluralize }}</span>
-      {% if resource.is_verified_upload %}<span class="tag tag-official">Course rep</span>{% endif %}
+      {% if resource.is_verified_upload %}<span class="tag tag-official">{% if resource.uploaded_by.staff_badge %}{{ resource.uploaded_by.staff_badge }}{% else %}Course rep{% endif %}</span>{% endif %}
     </p>
   </div>
   <a class="btn btn-ghost btn-sm" href="{% url 'resources:download' resource.pk %}" aria-label="Download {{ resource.title }}">Download</a>

@@ -32,7 +32,7 @@ def library_view(request):
         "resource_type": request.GET.get("type") if request.GET.get("type") in Resource.Type.values else None,
         "sort": request.GET.get("sort") if request.GET.get("sort") in services.SORTS else "useful",
     }
-    qs = Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by")
+    qs = Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
     resources = list(services.search(qs, **params)[:60])
     uni = user.department.faculty.university_id if user.department_id else None
     return render(request, "resources/library.html", {

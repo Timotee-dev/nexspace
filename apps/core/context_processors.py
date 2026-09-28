@@ -15,5 +15,6 @@ def nexspace(request):
         unread = unread_count(user)
     from django.conf import settings
 
-    return {"nexai_enabled": settings.NEXAI_ENABLED, "theme_preference": theme, "is_moderator": is_moderator, "is_dept_admin": is_dept_admin,
+    has_dashboard = bool(user is not None and user.is_authenticated and user.has_dashboard)
+    return {"has_dashboard": has_dashboard, "nexai_enabled": settings.NEXAI_ENABLED, "theme_preference": theme, "is_moderator": is_moderator, "is_dept_admin": is_dept_admin,
             "unread_notifications": unread}

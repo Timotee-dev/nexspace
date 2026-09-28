@@ -28,7 +28,7 @@ class PostQuerySet(models.QuerySet):
 
     def with_related(self):
         return self.select_related(
-            "author__profile", "poll", "event", "opportunity", "department", "space__course"
+            "author__profile", "author__staff_profile", "poll", "event", "opportunity", "department", "space__course"
         ).prefetch_related("topics", "attachments", "poll__options")
 
 

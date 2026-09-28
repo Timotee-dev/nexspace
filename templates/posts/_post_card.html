@@ -4,6 +4,8 @@
   <div class="post-side">
     {% if post.is_anonymous %}
       <span class="avatar avatar-anon" aria-hidden="true">?</span>
+    {% elif not post.author.is_active %}
+      {% include "partials/avatar.html" with person=post.author %}
     {% else %}
       <a href="{% url 'accounts:profile' post.author.username %}" tabindex="-1" aria-hidden="true">{% include "partials/avatar.html" with person=post.author %}</a>
     {% endif %}
@@ -12,7 +14,8 @@
     <header class="post-head">
       <span id="post-{{ post.pk }}-by" class="post-by">
         {% if post.is_anonymous %}<b>Anonymous Student</b>{% if post.author_id == user.pk %} <span class="tag">You</span>{% endif %}
-        {% else %}<a class="post-name" href="{% url 'accounts:profile' post.author.username %}">{{ post.author.full_name }}</a> <span class="post-handle">@{{ post.author.username }}</span>{% endif %}
+        {% elif not post.author.is_active %}<b>{{ post.author.full_name }}</b>
+        {% else %}<a class="post-name" href="{% url 'accounts:profile' post.author.username %}">{{ post.author.display_name }}</a>{% if post.author.staff_badge %} <span class="tag tag-staff">{{ post.author.staff_badge }}</span>{% else %} <span class="post-handle">@{{ post.author.username }}</span>{% endif %}{% endif %}
       </span>
       {% if post.space and not hide_space %}<a class="post-space" href="{{ post.space.get_absolute_url }}">{{ post.space.name|truncatechars:28 }}</a>{% endif %}
       <a class="post-time" href="{{ post.get_absolute_url }}"><time datetime="{{ post.created_at|date:'c' }}" title="{{ post.created_at|date:'j M Y, H:i' }}">{{ post.created_at|ago }}</time></a>

@@ -16,6 +16,7 @@ urlpatterns = [
     path("settings/", views.settings_profile_view, name="settings-profile"),
     path("settings/privacy/", views.settings_privacy_view, name="settings-privacy"),
     path("settings/account/", views.settings_account_view, name="settings-account"),
+    path("settings/delete-account/", views.delete_account_view, name="delete-account"),
     # Password reset (Django's secure token flow with NexSpace templates)
     path(
         "password-reset/",

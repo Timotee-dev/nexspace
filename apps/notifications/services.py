@@ -181,6 +181,40 @@ def join_decided(join_request):
            url=space.get_absolute_url() if approved else "/spaces/", actor=join_request.decided_by)
 
 
+@safely
+def staff_requested(staff):
+    from django.conf import settings
+    from django.db.models import Q
+
+    from apps.accounts.models import RoleAssignment, User
+
+    platform = User.objects.filter(Q(is_superuser=True) | Q(role_assignments__role=RoleAssignment.Role.SUPER_ADMIN),
+                                   is_active=True)
+    if settings.STAFF_VERIFICATION == "platform":
+        admins = list(platform.distinct())
+        url = "/platform/staff/"
+    else:
+        admins = list(User.objects.filter(role_assignments__role=RoleAssignment.Role.DEPARTMENT_ADMIN,
+                                          role_assignments__department=staff.user.department, is_active=True))
+        admins = admins or list(platform.distinct())  # a brand-new department: platform admins verify
+        url = "/manage/staff/"
+    notify(admins, category=Category.DEPARTMENT, kind=Notification.Kind.STAFF,
+           text=f"{staff.user.full_name} ({staff.user.department.name}) signed up as {staff.get_position_display()} "
+                "and needs verifying",
+           url=url, actor=staff.user, critical=True, dedupe_key=f"staff-request:{staff.pk}")
+
+
+@safely
+def staff_decided(staff):
+    approved = staff.status == "verified"
+    notify([staff.user], category=Category.DEPARTMENT, kind=Notification.Kind.STAFF, critical=True,
+           text=(f"You're verified as {staff.get_position_display()}. Your staff dashboard is ready."
+                 if approved else f"Your {staff.get_position_display()} account wasn't verified"
+                 + (f": {staff.note}" if staff.note else ".")),
+           url="/dashboard/" if approved else "/settings/account/", actor=staff.decided_by,
+           dedupe_key=f"staff-decided:{staff.pk}:{staff.status}")
+
+
 def audience_users(item):
     """Everyone a targeted announcement/event is meant for."""
     from apps.accounts.models import User

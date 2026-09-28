@@ -125,7 +125,7 @@ def _space_page(request, space, tab):
         from apps.resources.models import Resource
         from apps.resources.services import search
 
-        qs = Resource.objects.for_viewer(user).filter(course=course).select_related("session", "uploaded_by")
+        qs = Resource.objects.for_viewer(user).filter(course=course).select_related("session", "uploaded_by__staff_profile")
         if tab == "past-questions":
             qs = qs.filter(resource_type=Resource.Type.PAST_QUESTION)
         context["resources"] = list(search(qs, q=q, sort=request.GET.get("sort", "useful"))[:60])

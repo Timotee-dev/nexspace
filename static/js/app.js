@@ -163,7 +163,13 @@ document.querySelectorAll("[data-count]").forEach((field) => {
 });
 
 // ---------- PWA: service worker, install button, private-cache cleanup ----------
-if ("serviceWorker" in navigator) {
+const isLocal = ["localhost", "127.0.0.1"].includes(location.hostname);
+if ("serviceWorker" in navigator && isLocal) {
+  // On your laptop: no offline mode, so a stopped server shows a normal browser error
+  // instead of "You're offline". Also removes any service worker installed earlier.
+  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+  if ("caches" in window) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+} else if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js", { scope: "/" }).then((reg) => {
     if (document.body.dataset.authenticated !== "true") {
       // Signed out: drop the cached feed so the next person on this device can't see it.

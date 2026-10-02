@@ -94,16 +94,33 @@ def verify_email_view(request, token):
 
 
 @login_required
+def verify_code_view(request):
+    """Type the 6-digit code from the email instead of clicking the link."""
+    user = request.user
+    if user.email_verified:
+        return redirect("core:home")
+    error = None
+    if request.method == "POST":
+        if services.check_code(user, "verify", request.POST.get("code", "")):
+            services.mark_verified(user)
+            messages.success(request, "Email verified. You now have full access to NexSpace.")
+            return redirect("core:home")
+        error = ("That code isn't right, or it has expired. Use the code from the newest email, "
+                 "or send yourself a new one below. After 5 wrong tries you'll need a new code.")
+    return render(request, "accounts/verify_code.html", {"error": error})
+
+
+@login_required
 @require_POST
 def resend_verification_view(request):
     user = request.user
     if user.email_verified:
         messages.info(request, "Your email is already verified.")
     elif not cache.add(f"resend-verify:{user.pk}", 1, RESEND_COOLDOWN_SECONDS):
-        messages.error(request, "A verification email was sent less than a minute ago. Check your inbox.")
+        messages.error(request, "A code was sent less than a minute ago. Check your inbox and spam folder.")
     else:
         services.send_verification_email(user)
-        messages.success(request, f"Verification email sent to {user.email}.")
+        messages.success(request, f"We sent a new 6-digit code to {user.email}.")
     return redirect(_safe_next(request, reverse("core:home")))
 
 

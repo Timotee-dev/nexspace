@@ -1,5 +1,6 @@
 """Account business logic, shared by the template views and the API."""
 import logging
+from datetime import timedelta
 import re
 
 from django.conf import settings
@@ -76,11 +77,58 @@ def mark_verified(user) -> None:
     ensure_owner(user)
 
 
+# --- One-time email codes ------------------------------------------------------------
+CODE_LIFETIME = 30 * 60
+CODE_MAX_ATTEMPTS = 5
+
+
+def _hash_code(user, purpose, code):
+    import hashlib
+    import hmac
+
+    msg = f"{purpose}:{user.pk}:{code}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()
+
+
+def issue_code(user, purpose) -> str:
+    """Create a fresh 6-digit code (replacing any unused one for the same purpose) and return it."""
+    import secrets
+
+    from .models import EmailCode
+
+    EmailCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True).delete()
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    EmailCode.objects.create(user=user, purpose=purpose, code_hash=_hash_code(user, purpose, code),
+                             expires_at=timezone.now() + timezone.timedelta(seconds=CODE_LIFETIME))
+    return code
+
+
+def check_code(user, purpose, code) -> bool:
+    """True (and the code is used up) if `code` is the user's current, unexpired code for `purpose`."""
+    import hmac
+
+    from .models import EmailCode
+
+    code = "".join(ch for ch in str(code or "") if ch.isdigit())
+    entry = (EmailCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True,
+                                      expires_at__gt=timezone.now()).order_by("-created_at").first())
+    if entry is None or entry.attempts >= CODE_MAX_ATTEMPTS or len(code) != 6:
+        if entry is not None and len(code) == 6:
+            EmailCode.objects.filter(pk=entry.pk).update(attempts=entry.attempts + 1)
+        return False
+    if not hmac.compare_digest(entry.code_hash, _hash_code(user, purpose, code)):
+        EmailCode.objects.filter(pk=entry.pk).update(attempts=entry.attempts + 1)
+        return False
+    EmailCode.objects.filter(pk=entry.pk).update(used_at=timezone.now())
+    return True
+
+
 def send_verification_email(user) -> None:
     link = settings.SITE_URL + reverse("accounts:verify-email", args=[make_verification_token(user)])
-    context = {"user": user, "link": link, "days": settings.EMAIL_VERIFICATION_MAX_AGE.days, "site_url": settings.SITE_URL}
+    context = {"user": user, "link": link, "days": settings.EMAIL_VERIFICATION_MAX_AGE.days, "site_url": settings.SITE_URL,
+               "code": issue_code(user, "verify"), "code_url": settings.SITE_URL + reverse("accounts:verify-code")}
     message = EmailMultiAlternatives(
-        subject="Verify your NexSpace email",
+        subject=f"{context['code']} is your NexSpace verification code",
         body=render_to_string("emails/verify_email.txt", context),
         to=[user.email],
     )
@@ -251,3 +299,4 @@ def verify_staff(*, admin, staff, approve: bool, note=""):
 
     notifications.staff_decided(staff)
     return staff
+

@@ -26,7 +26,9 @@ This is your `DATABASE_URL`.
 2. SMTP & API → API keys → create a key. That's `BREVO_API_KEY`.
 3. Security → Authorised IPs: **turn IP blocking off** for this key. Render's outgoing IP changes on each deploy.
 
-NexSpace sends over Brevo's HTTPS API, not SMTP (Render blocks SMTP ports).
+NexSpace sends over Brevo's HTTPS API, not SMTP (Render blocks SMTP ports). You only need `BREVO_API_KEY` and `DEFAULT_FROM_EMAIL` (the exact sender you verified) on Render — no `EMAIL_HOST`/`EMAIL_PORT` variables.
+
+Brevo's free plan rewrites every link in an email into a tracking link, and that redirect can hang on some phones. NexSpace works around it: verification emails include a 6-digit code (users tap **Enter code** on the banner), and links are also printed as plain text, which Brevo leaves alone.
 
 ## 4. Files — Cloudinary
 

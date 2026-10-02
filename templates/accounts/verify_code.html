@@ -1,0 +1,22 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Enter your code{% endblock %}
+{% block card %}
+<header>
+  <h1>Enter your verification code</h1>
+  <p>We emailed a 6-digit code to <b>{{ user.email }}</b>. It's in the subject line too.</p>
+</header>
+{% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  <div class="field">
+    <label for="code">Code</label>
+    <input id="code" name="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required autofocus placeholder="123456">
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">Verify my email</button>
+</form>
+<form method="post" action="{% url 'accounts:resend-verification' %}" class="form" style="margin-top:12px">
+  {% csrf_token %}<input type="hidden" name="next" value="{% url 'accounts:verify-code' %}">
+  <button type="submit" class="btn btn-ghost btn-block">Send a new code</button>
+</form>
+<p class="auth-switch"><a href="{% url 'core:home' %}">Back to NexSpace</a></p>
+{% endblock %}

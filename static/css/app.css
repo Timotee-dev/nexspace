@@ -1243,3 +1243,5 @@ label.chip { display: inline-flex; cursor: pointer; }
 .live-pill { position: sticky; top: calc(var(--topbar-h, 0px) + 8px); z-index: 6; display: flex; justify-content: center; margin: 0 0 var(--s2); }
 .live-pill button { box-shadow: var(--shadow); }
 @media (min-width: 768px) { .live-pill { top: var(--s2); } }
+.code-input { font-size: 28px !important; letter-spacing: 10px; text-align: center; font-family: ui-monospace, "Courier New", monospace; }
+.banner-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }

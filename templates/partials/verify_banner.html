@@ -1,7 +1,10 @@
 <div class="banner" role="region" aria-label="Email verification">
-  <p><b>Verify your email to join the conversation.</b> We sent a link to {{ user.email }}. Until then you can browse and set up your profile.</p>
-  <form method="post" action="{% url 'accounts:resend-verification' %}">
-    {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-    <button type="submit" class="btn btn-ghost"><svg class="icon-sm"><use href="#i-mail"/></svg>Resend email</button>
-  </form>
+  <p><b>Verify your email to join the conversation.</b> We sent a 6-digit code to {{ user.email }}. Until then you can browse and set up your profile.</p>
+  <div class="banner-actions">
+    <a class="btn btn-primary" href="{% url 'accounts:verify-code' %}">Enter code</a>
+    <form method="post" action="{% url 'accounts:resend-verification' %}">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-ghost"><svg class="icon-sm"><use href="#i-mail"/></svg>Resend email</button>
+    </form>
+  </div>
 </div>

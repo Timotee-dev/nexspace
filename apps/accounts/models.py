@@ -355,3 +355,26 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return f"{self.get_position_display()}: {self.user.full_name} ({self.get_status_display()})"
+
+
+class EmailCode(models.Model):
+    """A 6-digit one-time code sent by email (verification or password reset).
+
+    Codes work even when an email provider rewrites or breaks links (Brevo's free plan wraps every link in
+    click tracking). Only a keyed hash is stored; codes expire after 30 minutes and lock after 5 wrong tries.
+    """
+
+    class Purpose(models.TextChoices):
+        VERIFY = "verify", "Email verification"
+        RESET = "reset", "Password reset"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_codes")
+    purpose = models.CharField(max_length=8, choices=Purpose.choices)
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "purpose"])]

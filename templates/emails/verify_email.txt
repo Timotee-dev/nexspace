@@ -1,9 +1,10 @@
 Hi {{ user.get_short_name }},
 
-Confirm your email to start posting, commenting and sharing on NexSpace:
+Your NexSpace verification code is: {{ code }}
 
+Open NexSpace, tap "Enter code" on the yellow banner and type it in. The code works for 30 minutes.
+
+Or open this address in your browser:
 {{ link }}
 
-This link expires in {{ days }} days. If you didn't create a NexSpace account, you can ignore this email.
-
-— NexSpace
+If you didn't create a NexSpace account, ignore this email.

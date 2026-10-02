@@ -2,10 +2,18 @@
 <article class="pending-staff{% if not compact %} panel stack{% endif %}">
   <p><b>{{ s.get_title_display }} {{ s.user.full_name }}</b> <span class="tag tag-staff">{{ s.get_position_display }}</span><br>
     <span class="small muted">{{ s.user.department.name }} · {{ s.user.email }}{% if s.staff_id %} · Staff ID {{ s.staff_id }}{% endif %} · {{ s.created_at|date:"j M" }}</span></p>
-  {% if s.requested_courses.all %}<p class="small">Teaches: {% for c in s.requested_courses.all %}<b>{{ c.code }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if s.requested_courses.all %}<p class="small">Says they teach: {% for c in s.requested_courses.all %}<b>{{ c.code }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% elif s.position == "lecturer" %}<p class="small muted">Didn't pick any courses{% if compact %} — open "Staff to verify" to choose them{% endif %}.</p>{% endif %}
   {% if s.requested_level %}<p class="small">Advises: <b>{{ s.requested_level }} Level</b></p>{% endif %}
+  {% if s.position == "lecturer" and not s.requested_courses.all %}<p class="small muted">No courses picked. After verifying, add their courses from <a href="{% url 'manage:user' s.user.pk %}?dept={{ s.user.department_id }}">their account</a> → Assign role → Lecturer.</p>{% endif %}
   <form method="post" action="{% url 'platform:staff-decision' s.pk %}" class="mod-actions">{% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    {% if not compact and s.position == "lecturer" %}
+    <fieldset class="field"><legend class="small">Courses they'll be lecturer for</legend>
+      <input type="hidden" name="courses_submitted" value="1">
+      {% if s.course_choices %}<div class="course-picks">{% for c in s.course_choices %}<label class="choice"><input type="checkbox" name="courses" value="{{ c.pk }}"{% if c.pk in s.picked %} checked{% endif %}><span class="choice-text">{{ c.code }} — {{ c.title }}</span></label>{% endfor %}</div>
+      {% else %}<p class="small muted">{{ s.user.department.name }} has no courses yet. Verify now and add their courses later in Manage → People → Assign role → Lecturer, or add courses first in Manage → Courses.</p>{% endif %}
+    </fieldset>
+    {% endif %}
     {% if not compact %}<label class="visually-hidden" for="pnote-{{ s.pk }}">Reason</label><input id="pnote-{{ s.pk }}" name="note" maxlength="300" placeholder="Reason, if you reject (they'll see it)">{% endif %}
     <div class="mod-buttons"><button name="decision" value="approve" class="btn btn-primary btn-sm">Verify</button><button name="decision" value="reject" class="btn btn-ghost btn-sm">Reject</button></div>
   </form>

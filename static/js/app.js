@@ -485,3 +485,20 @@ document.addEventListener("submit", async (e) => {
     toast(err.message, "error");
   }
 });
+
+// ---------- Sign-up: only show courses from the chosen department ----------
+(() => {
+  const deptSelect = document.querySelector('.signup-form select[name="department"]');
+  if (!deptSelect) return;
+  const sync = () => {
+    let shown = 0;
+    document.querySelectorAll(".course-picks [data-dept]").forEach((label) => {
+      label.hidden = deptSelect.value !== "" && label.dataset.dept !== deptSelect.value;
+      if (!label.hidden) shown += 1;
+    });
+    const empty = document.querySelector(".course-picks-empty");
+    if (empty) empty.hidden = shown > 0;  // "No courses have been added for this department yet"
+  };
+  deptSelect.addEventListener("change", sync);
+  sync();
+})();

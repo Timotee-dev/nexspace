@@ -80,10 +80,9 @@ class SignupForm(forms.Form):
                 self.add_error("position", "Choose your position.")
             if position == "lecturer":
                 dept = data.get("department")
-                courses = [c for c in data.get("courses") or [] if dept and c.department_id == dept.pk]
-                if not courses:
-                    self.add_error("courses", "Pick at least one course you teach in this department.")
-                data["courses"] = courses
+                # Optional: the department may not have added its courses yet, or the course may be new.
+                # The HOD or platform admin links lecturers to courses when verifying them.
+                data["courses"] = [c for c in data.get("courses") or [] if dept and c.department_id == dept.pk]
             if position == "level_adviser" and not data.get("adviser_level"):
                 self.add_error("adviser_level", "Choose the level you advise.")
             data["level"] = None

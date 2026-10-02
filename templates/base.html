@@ -27,7 +27,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23f5c451'/><text x='16' y='22.5' font-family='Arial' font-weight='800' font-size='17' text-anchor='middle' fill='%23221a03'>N</text></svg>">
   {% block head %}{% endblock %}
 </head>
-<body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}">
+<body data-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}" data-max-doc-mb="{{ max_document_mb }}">
   {% include "partials/icons.html" %}
   <a class="skip-link" href="#main">Skip to content</a>
   {% include "partials/messages.html" %}

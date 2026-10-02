@@ -124,6 +124,19 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Lecturer sign-up fix (v0.9.2)
+
+- Lecturers can sign up even when their department has no courses on NexSpace yet (the course list is optional, and says so when it's empty). The course list follows the department picked.
+- Whoever verifies a lecturer (Platform → Staff to verify) ticks the courses they'll be lecturer for — correcting or adding to what the lecturer picked. Courses can also be added later in Manage → People → Assign role → Lecturer.
+
+## Supabase Storage (v0.9.1)
+
+- Optional: files can live in **Supabase Storage** instead of Cloudinary (only used if the `SUPABASE_S3_*` variables are set) (the same project as the database): up to **50 MB per file** on the free plan, in a **private** bucket. Every download or image is a signed link that expires after an hour, so course materials can't be passed around outside NexSpace by copying a link. Downloads keep their original file names.
+- Cloud downloads now go straight from storage to the student instead of through the Render server, which keeps the free server fast and avoids running out of memory on big files.
+- Clearer upload errors: "Files must be 50 MB or smaller" for size, and a separate "File storage isn't responding" message (with the real cause in the server log) for storage problems.
+- The upload limit shown on the compose and upload pages follows the real limit. Server request timeout raised to 180 seconds for big uploads on slow connections.
+- Set up: DEPLOY.md section 4. Cloudinary still works if you prefer it.
+
 ## Edits, reposts, messages, digests and live updates (v0.9)
 
 - **Editing:** authors can edit their posts ("Edit post" in the menu) and comments. Edited items show "Edited"; every earlier version is kept and visible to the author and moderators ("Edit history"), so nobody can quietly change a post after it's reported. A poll's question locks once anyone has voted; kind, anonymity, Space and attachments never change. Newly @mentioned people are notified.

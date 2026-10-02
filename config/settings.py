@@ -134,13 +134,29 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# File storage, in order of preference:
+#   1. Supabase Storage (private bucket, signed links, up to 50 MB per file on the free plan)
+#   2. Cloudinary (public links, 10 MB per file on the free plan)
+#   3. The local disk (development only — Render wipes it on every deploy)
+SUPABASE_S3_ENDPOINT = os.environ.get("SUPABASE_S3_ENDPOINT", "").strip().rstrip("/")
+SUPABASE_S3_REGION = os.environ.get("SUPABASE_S3_REGION", "").strip()
+SUPABASE_S3_ACCESS_KEY_ID = os.environ.get("SUPABASE_S3_ACCESS_KEY_ID", "").strip()
+SUPABASE_S3_SECRET_ACCESS_KEY = os.environ.get("SUPABASE_S3_SECRET_ACCESS_KEY", "").strip()
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "nexspace").strip()
+SUPABASE_STORAGE = all([SUPABASE_S3_ENDPOINT, SUPABASE_S3_REGION, SUPABASE_S3_ACCESS_KEY_ID,
+                        SUPABASE_S3_SECRET_ACCESS_KEY])
 CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL", "").strip()
+if SUPABASE_STORAGE:
+    FILE_STORAGE_NAME = "Supabase Storage"
+    _default_storage = "apps.core.storage.SupabaseStorage"
+elif CLOUDINARY_URL:
+    FILE_STORAGE_NAME = "Cloudinary"
+    _default_storage = "apps.core.storage.CloudinaryStorage"
+else:
+    FILE_STORAGE_NAME = ""
+    _default_storage = "django.core.files.storage.FileSystemStorage"
 STORAGES = {
-    "default": {
-        "BACKEND": "apps.core.storage.CloudinaryStorage"
-        if CLOUDINARY_URL
-        else "django.core.files.storage.FileSystemStorage",
-    },
+    "default": {"BACKEND": _default_storage},
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
         if not DEBUG
@@ -150,7 +166,7 @@ STORAGES = {
 
 # Upload limits (Section 39 of the spec). Cloudinary's free plan rejects files over 10 MB.
 MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
-MAX_DOCUMENT_MB = int(os.environ.get("MAX_DOCUMENT_MB", "10"))
+MAX_DOCUMENT_MB = int(os.environ.get("MAX_DOCUMENT_MB", "50" if SUPABASE_STORAGE else "10"))
 MAX_DOCUMENT_UPLOAD_BYTES = MAX_DOCUMENT_MB * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_DOCUMENT_UPLOAD_BYTES + 1024 * 1024
 
@@ -193,7 +209,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.9.0",
+    "VERSION": "0.9.2",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",

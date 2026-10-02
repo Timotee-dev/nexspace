@@ -83,7 +83,7 @@
   <div class="attach-row">
     <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-image"/></svg>Images<input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-attach="images" aria-label="Add images (up to 4)"></label>
     <label class="btn btn-ghost btn-sm file-btn"><svg class="icon-sm"><use href="#i-file"/></svg>Files<input type="file" name="files" accept=".pdf,.doc,.docx,.ppt,.pptx" multiple data-attach="files" aria-label="Add PDF, Word or PowerPoint files (up to 3)"></label>
-    <span class="muted small">Up to 4 images (5 MB each) and 3 files (10 MB each)</span>
+    <span class="muted small">Up to 4 images (5 MB each) and 3 files ({{ max_document_mb }} MB each)</span>
   </div>
   <ul class="attach-preview" data-attach-preview aria-live="polite"></ul>
 

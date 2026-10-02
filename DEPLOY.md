@@ -30,9 +30,26 @@ NexSpace sends over Brevo's HTTPS API, not SMTP (Render blocks SMTP ports). You 
 
 Brevo's free plan rewrites every link in an email into a tracking link, and that redirect can hang on some phones. NexSpace works around it: verification emails include a 6-digit code (users tap **Enter code** on the banner), and links are also printed as plain text, which Brevo leaves alone.
 
-## 4. Files — Cloudinary
+## 4. Files — Supabase Storage (recommended) or Cloudinary
 
-Dashboard → copy the **API environment variable** (`cloudinary://...`). That's `CLOUDINARY_URL`.
+**Supabase Storage** (same Supabase project as your database): files up to 50 MB each, 1 GB total on the free plan, kept in a *private* bucket — every download is a signed link that expires after an hour.
+
+1. Supabase → **Storage** → **New bucket** → name `nexspace`, leave **Public bucket OFF** → Create.
+2. **Project Settings → Storage → S3 Connection** (or Storage → Settings → S3 access): copy the **Endpoint** (`https://<project-ref>.supabase.co/storage/v1/s3`) and the **Region**.
+3. On the same page, **New access key** → copy the **Access key ID** and **Secret access key** (the secret is shown once).
+4. Add these on Render:
+
+| Variable | Value |
+|---|---|
+| `SUPABASE_S3_ENDPOINT` | the endpoint |
+| `SUPABASE_S3_REGION` | the region, e.g. `eu-central-1` |
+| `SUPABASE_S3_ACCESS_KEY_ID` | the access key ID |
+| `SUPABASE_S3_SECRET_ACCESS_KEY` | the secret |
+| `SUPABASE_STORAGE_BUCKET` | `nexspace` (only if you named it differently) |
+
+When these are set, NexSpace uses Supabase Storage and allows 50 MB per file (change with `MAX_DOCUMENT_MB`; Supabase's free plan caps single files at 50 MB). You can then delete `CLOUDINARY_URL`.
+
+**Cloudinary** (alternative): public links and 10 MB per file on the free plan. Dashboard → copy the **API environment variable** (`cloudinary://...`) into `CLOUDINARY_URL`, and in Settings → Security tick "Allow delivery of PDF and ZIP files".
 
 ## 5. Render
 
@@ -44,7 +61,7 @@ Dashboard → copy the **API environment variable** (`cloudinary://...`). That's
 | `DATABASE_URL` | Supabase pooler string |
 | `BREVO_API_KEY` | from Brevo |
 | `DEFAULT_FROM_EMAIL` | `NexSpace <no-reply@yourdomain>` (the verified sender) |
-| `CLOUDINARY_URL` | from Cloudinary |
+| `SUPABASE_S3_*` | from Supabase Storage (section 4) — or `CLOUDINARY_URL` instead |
 | `SITE_URL` | `https://your-app.onrender.com` (or your domain) — used in email links |
 | `ALLOWED_HOSTS` | `your-app.onrender.com,yourdomain.com` |
 | `CSRF_TRUSTED_ORIGINS` | `https://your-app.onrender.com,https://yourdomain.com` |

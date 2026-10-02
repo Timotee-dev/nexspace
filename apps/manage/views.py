@@ -424,7 +424,14 @@ def staff_decision_view(request, pk):
     staff = get_object_or_404(StaffProfile.objects.select_related("user"), pk=pk, user__department=request.manage_department)
     approve = request.POST.get("decision") == "approve"
     try:
-        verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""))
+        from apps.academics.models import Course
+
+        picked = None
+        if staff.position == "lecturer" and "courses_submitted" in request.POST:
+            picked = list(Course.objects.filter(pk__in=request.POST.getlist("courses"),
+                                                department=staff.user.department))
+        verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""),
+                     courses=picked)
         messages.success(request, f"{staff.user.full_name} {'verified as ' + staff.get_position_display() if approve else 'not verified'}.")
     except PermissionDenied as exc:
         messages.error(request, str(exc) or "You can't verify this account.")

@@ -243,8 +243,7 @@ def poll_vote_view(request, pk):
 def attachment_download_view(request, pk, attachment_id):
     post = get_visible_post(request.user, pk)
     attachment = get_object_or_404(Attachment, pk=attachment_id, post=post)
-    storage = attachment.file.storage
-    if hasattr(storage, "path"):
+    if _is_local(attachment.file):
         try:
             return FileResponse(
                 attachment.file.open("rb"), as_attachment=attachment.kind == Attachment.Kind.FILE,
@@ -252,7 +251,10 @@ def attachment_download_view(request, pk, attachment_id):
             )
         except NotImplementedError:
             pass
-    return HttpResponseRedirect(attachment.file.url)
+    from apps.core.storage import download_url
+
+    return HttpResponseRedirect(download_url(attachment.file, attachment.original_name,
+                                             as_attachment=attachment.kind == Attachment.Kind.FILE))
 
 
 # --- Saved & topics -----------------------------------------------------------
@@ -437,3 +439,10 @@ def live_comments_view(request, pk):
     new = (Comment.objects.filter(post=post, id__gt=after, is_deleted=False, is_hidden=False)
            .exclude(author=request.user).count())
     return JsonResponse({"new": new, "comment_count": post.comment_count})
+
+
+def _is_local(fieldfile):
+    """Local-disk files are streamed by Django; cloud files redirect straight to storage."""
+    from django.core.files.storage import FileSystemStorage
+
+    return isinstance(fieldfile.storage, FileSystemStorage)

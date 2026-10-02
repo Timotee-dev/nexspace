@@ -143,3 +143,34 @@ def test_mobile_drawer_markup(client, make_user):
 
 def test_sessions_last_30_days(settings):
     assert settings.SESSION_COOKIE_AGE == 60 * 60 * 24 * 30
+
+
+def test_lecturer_can_sign_up_when_no_courses_exist(client, department):
+    from apps.accounts.models import StaffProfile
+
+    page = client.get(reverse("accounts:signup")).content.decode()
+    assert "No courses have been added for this department yet" in page
+    r = client.post(reverse("accounts:signup"), {
+        "account_type": "staff", "position": "lecturer", "title": "dr", "full_name": "New Lecturer",
+        "email": "lect@example.com", "department": department.pk, "password": PASSWORD, "confirm_password": PASSWORD,
+    })
+    assert r.status_code == 302
+    staff = StaffProfile.objects.get(user__email="lect@example.com")
+    assert staff.position == "lecturer" and not staff.requested_courses.exists()
+
+
+def test_platform_admin_picks_lecturer_courses_when_verifying(client, owner, department):
+    from apps.academics.models import Course
+
+    c1 = Course.objects.create(department=department, code="CSC 301", title="DS", level=300, semester=1)
+    c2 = Course.objects.create(department=department, code="CSC 305", title="OS", level=300, semester=1)
+    lecturer = register_staff(email="l@example.com", password=PASSWORD, full_name="Lec", department=department,
+                              position="lecturer", courses=[c1])
+    client.force_login(owner)
+    page = client.get(reverse("platform:staff")).content.decode()
+    assert "Courses they" in page and "CSC 305" in page
+    client.post(reverse("platform:staff-decision", args=[lecturer.staff_profile.pk]),
+                {"decision": "approve", "courses_submitted": "1", "courses": [c2.pk]})
+    lecturer.refresh_from_db()
+    assert lecturer.has_role(RoleAssignment.Role.LECTURER, course=c2)
+    assert not lecturer.has_role(RoleAssignment.Role.LECTURER, course=c1)

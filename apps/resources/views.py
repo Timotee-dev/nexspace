@@ -87,14 +87,15 @@ def detail_view(request, pk):
 def download_view(request, pk):
     resource = _visible(request, pk)
     services.record_download(user=request.user, resource=resource)
-    storage = resource.file.storage
-    if hasattr(storage, "path"):
+    if _is_local(resource.file):
         try:
             return FileResponse(resource.file.open("rb"), as_attachment=True, filename=resource.original_name,
                                 content_type=resource.content_type)
         except NotImplementedError:
             pass
-    return HttpResponseRedirect(resource.file.url)
+    from apps.core.storage import download_url
+
+    return HttpResponseRedirect(download_url(resource.file, resource.original_name))
 
 
 @login_required
@@ -125,3 +126,10 @@ def remove_view(request, pk):
     except PermissionDenied as exc:
         messages.error(request, str(exc))
         return redirect(resource.get_absolute_url())
+
+
+def _is_local(fieldfile):
+    """Local-disk files are streamed by Django; cloud files redirect straight to storage."""
+    from django.core.files.storage import FileSystemStorage
+
+    return isinstance(fieldfile.storage, FileSystemStorage)

@@ -32,8 +32,9 @@
       {% include "partials/field.html" with field=form.title %}
     </div>
     <div class="lecturer-only">
-      <fieldset class="field"><legend>{{ form.courses.label }}</legend>
-        <p class="field-help">Pick courses from the department you chose above.</p>
+      <fieldset class="field"><legend>{{ form.courses.label }} <span class="optional">(optional)</span></legend>
+        <p class="field-help">Tick the courses you teach in the department you chose above. Not listed yet? Leave this empty; whoever verifies your account can add your courses.</p>
+        <p class="field-help course-picks-empty" hidden><b>No courses have been added for this department yet.</b> That's fine: sign up anyway, and your courses can be added when your account is verified.</p>
         <div class="course-picks">{% for c in form.courses %}<label class="choice" data-dept="{{ c.data.value.instance.department_id }}">{{ c.tag }}<span class="choice-text">{{ c.choice_label }}</span></label>{% endfor %}</div>
         {% for error in form.courses.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
       </fieldset>

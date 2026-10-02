@@ -16,7 +16,13 @@ class ResourceUploadForm(forms.Form):
     semester = forms.TypedChoiceField(choices=[("", "Course default"), *Semester.choices], coerce=int,
                                       required=False, empty_value=None)
     description = forms.CharField(max_length=1000, required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    file = forms.FileField(help_text="PDF, Word or PowerPoint, up to 10 MB")
+    file = forms.FileField(help_text="PDF, Word or PowerPoint")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.conf import settings
+
+        self.fields["file"].help_text = f"PDF, Word or PowerPoint, up to {settings.MAX_DOCUMENT_MB} MB"
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)

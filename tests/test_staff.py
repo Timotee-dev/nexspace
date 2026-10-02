@@ -67,8 +67,6 @@ def test_staff_signup_is_pending_with_no_powers(client, run_hooks, department, c
 
 
 def test_staff_signup_validation(client, department, courses):
-    r = staff_signup(client, department)  # lecturer with no courses
-    assert r.status_code == 200 and "Pick at least one course" in r.content.decode()
     r = staff_signup(client, department, position="level_adviser")
     assert "Choose the level you advise" in r.content.decode()
     r = staff_signup(client, department, position="")
@@ -234,3 +232,11 @@ def test_admin_assigns_lecturer_and_adviser_roles(client, department, courses, h
                                                                   "level": 200})
     assert member.has_role(R.LECTURER, course=courses[1])
     assert set(member.role_assignments.filter(role="level_adviser").values_list("level", flat=True)) == {100, 200}
+
+
+def test_lecturer_can_sign_up_before_courses_exist(client, department):
+    """A brand-new department has no courses yet; lecturers must still be able to sign up."""
+    r = staff_signup(client, department)
+    assert r.status_code == 302
+    user = User.objects.get(email="funmi@example.com")
+    assert user.staff.position == "lecturer" and not user.staff.requested_courses.exists()

@@ -99,7 +99,9 @@ def system_health():
         checks.append(("Cache", False, str(exc)[:120]))
     checks += [
         ("Email", bool(settings.BREVO_API_KEY), "Brevo" if settings.BREVO_API_KEY else "Not set: emails only print to the server log"),
-        ("File storage", bool(settings.CLOUDINARY_URL), "Cloudinary" if settings.CLOUDINARY_URL else "Local disk: uploads are lost on each Render deploy"),
+        ("File storage", bool(settings.FILE_STORAGE_NAME),
+         f"{settings.FILE_STORAGE_NAME} · up to {settings.MAX_DOCUMENT_MB} MB per file" if settings.FILE_STORAGE_NAME
+         else "Local disk: uploads are lost on each Render deploy"),
         ("Push notifications", settings.PUSH_ENABLED, "On" if settings.PUSH_ENABLED else "Off (no VAPID keys)"),
         ("NexAI answers", settings.NEXAI_ENABLED, settings.NEXAI_MODEL if settings.NEXAI_ENABLED else "Search-only (no API key)"),
         ("Production mode", not settings.DEBUG, "DEBUG is off" if not settings.DEBUG else "DEBUG is ON — never on the live site"),
@@ -256,8 +258,15 @@ def people_view(request):
 @platform_required
 def staff_view(request):
     staff = StaffProfile.objects.select_related("user__department", "decided_by").prefetch_related("requested_courses")
+    pending = list(staff.filter(status="pending").order_by("created_at"))
+    from apps.academics.models import Course
+
+    for s in pending:
+        s.course_choices = list(Course.objects.filter(department=s.user.department, is_active=True)
+                                .order_by("level", "code")) if s.position == "lecturer" else []
+        s.picked = {c.pk for c in s.requested_courses.all()}
     return _render(request, "platform/staff.html", {
-        "pending": staff.filter(status="pending").order_by("created_at"),
+        "pending": pending,
         "recent": staff.exclude(status="pending").order_by("-decided_at")[:30],
     }, "staff")
 
@@ -268,7 +277,14 @@ def staff_decision_view(request, pk):
     staff = get_object_or_404(StaffProfile.objects.select_related("user"), pk=pk)
     approve = request.POST.get("decision") == "approve"
     try:
-        verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""))
+        from apps.academics.models import Course
+
+        picked = None
+        if staff.position == "lecturer" and "courses_submitted" in request.POST:
+            picked = list(Course.objects.filter(pk__in=request.POST.getlist("courses"),
+                                                department=staff.user.department))
+        verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""),
+                     courses=picked)
         messages.success(request, f"{staff.user.full_name} "
                                   f"{'verified as ' + staff.get_position_display() if approve else 'not verified'}.")
     except PermissionDenied as exc:

@@ -268,7 +268,7 @@ def can_verify_staff(admin, staff) -> bool:
 
 
 @transaction.atomic
-def verify_staff(*, admin, staff, approve: bool, note=""):
+def verify_staff(*, admin, staff, approve: bool, note="", courses=None):
     """Approve (grant the position's permissions) or reject a staff account."""
     from django.core.exceptions import PermissionDenied
 
@@ -290,6 +290,8 @@ def verify_staff(*, admin, staff, approve: bool, note=""):
             assign_role(user=user, role=R.LEVEL_ADVISER, department=dept, level=staff.requested_level,
                         granted_by=admin)
         elif staff.position == P.LECTURER:
+            if courses is not None:  # the verifier picked (or corrected) the lecturer's courses
+                staff.requested_courses.set([c for c in courses if c.department_id == dept.pk])
             for course in staff.requested_courses.all():
                 assign_role(user=user, role=R.LECTURER, course=course, granted_by=admin)
         if not user.email_verified:  # the HOD vouching for them is at least as strong as an email link

@@ -69,12 +69,14 @@ def announcement_attachment_view(request, pk):
     item = _visible_announcement(request.user, pk)
     if not item.attachment:
         raise Http404
-    if hasattr(item.attachment.storage, "path"):
+    if _is_local(item.attachment):
         try:
             return FileResponse(item.attachment.open("rb"), as_attachment=True, filename=item.attachment_name)
         except NotImplementedError:
             pass
-    return HttpResponseRedirect(item.attachment.url)
+    from apps.core.storage import download_url
+
+    return HttpResponseRedirect(download_url(item.attachment, item.attachment_name))
 
 
 @login_required
@@ -134,3 +136,10 @@ def event_create_view(request):
                                                  "submit": "Add date"})
 
 
+
+
+def _is_local(fieldfile):
+    """Local-disk files are streamed by Django; cloud files redirect straight to storage."""
+    from django.core.files.storage import FileSystemStorage
+
+    return isinstance(fieldfile.storage, FileSystemStorage)

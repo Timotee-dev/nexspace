@@ -1,6 +1,7 @@
 {% load nexspace %}
 {# One post. Context: post (annotated by feed.annotate_for_user), detail (bool) #}
-<article class="post{% if detail %} post-detail{% endif %}{% if post.is_hidden %} post-hidden{% endif %}" id="post-{{ post.pk }}" aria-labelledby="post-{{ post.pk }}-by">
+<article class="post{% if detail %} post-detail{% endif %}{% if post.is_hidden %} post-hidden{% endif %}{% if post.reposted_by %} post-reposted{% endif %}" id="post-{{ post.pk }}{% if post.repost_row_id %}-r{{ post.repost_row_id }}{% endif %}" aria-labelledby="post-{{ post.pk }}-by">
+  {% if post.reposted_by %}<p class="repost-line"><svg class="icon-sm" aria-hidden="true"><use href="#i-repost"/></svg>{% if post.reposted_by.pk == user.pk %}You reposted{% else %}<a href="{% url 'accounts:profile' post.reposted_by.username %}">{{ post.reposted_by.display_name }}</a> reposted{% endif %}</p>{% endif %}
   <div class="post-side">
     {% if post.is_anonymous %}
       <span class="avatar avatar-anon" aria-hidden="true">?</span>
@@ -19,6 +20,7 @@
       </span>
       {% if post.space and not hide_space %}<a class="post-space" href="{{ post.space.get_absolute_url }}">{{ post.space.name|truncatechars:28 }}</a>{% endif %}
       <a class="post-time" href="{{ post.get_absolute_url }}"><time datetime="{{ post.created_at|date:'c' }}" title="{{ post.created_at|date:'j M Y, H:i' }}">{{ post.created_at|ago }}</time></a>
+      {% if post.edited_at %}<span class="edited" title="Edited {{ post.edited_at|date:'j M Y, H:i' }}">· Edited</span>{% endif %}
     </header>
     {% if post.is_hidden %}<p class="hidden-note">Hidden while moderators review reports. Only you{% if is_moderator %} and moderators{% endif %} can see it.</p>{% endif %}
     {% if post.is_official or post.kind != "post" %}
@@ -33,6 +35,8 @@
     {% if post.body %}
       <div class="post-body">{% if detail or post.body|length <= 480 %}{{ post.body|render_body }}{% else %}{{ post.body|truncatechars:420|render_body }}<a class="read-more" href="{{ post.get_absolute_url }}">Read more</a>{% endif %}</div>
     {% endif %}
+
+    {% if post.repost_of_id and post.kind != "repost" %}{% include "posts/_embed.html" with original=post.repost_of %}{% endif %}
 
     {% if post.kind == "poll" %}{% include "posts/_poll.html" %}{% endif %}
     {% if post.kind == "event" and post.event %}
@@ -69,6 +73,17 @@
     <footer class="post-actions">
       {% include "posts/_vote.html" with kind="post" obj=post up=post.my_vote_up down=post.my_vote_down %}
       <a class="action" href="{{ post.get_absolute_url }}#comments" aria-label="{{ post.comment_count }} comments"><svg class="icon-sm"><use href="#i-comment"/></svg><span>{{ post.comment_count|compact }}</span></a>
+      <details class="menu repost-menu">
+        <summary class="action{% if post.is_reposted %} is-on{% endif %}" aria-label="Repost or quote ({{ post.repost_count }})" data-repost-summary="{{ post.pk }}"><svg class="icon-sm"><use href="#i-repost"/></svg><span data-repost-count>{{ post.repost_count|compact }}</span></summary>
+        <div class="menu-panel">
+          <form method="post" action="{% url 'posts:repost' post.pk %}" data-repost="{{ post.pk }}">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="action" value="{% if post.is_reposted %}undo{% else %}repost{% endif %}">
+            <button type="submit" class="menu-item">{% if post.is_reposted %}Undo repost{% else %}Repost{% endif %}</button>
+          </form>
+          <a class="menu-item" href="{% url 'posts:quote' post.pk %}">Quote</a>
+        </div>
+      </details>
       <form method="post" action="{% url 'posts:bookmark' post.pk %}" data-bookmark="{{ post.pk }}">
         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}#post-{{ post.pk }}">
         <button type="submit" class="action" aria-pressed="{% if post.is_bookmarked %}true{% else %}false{% endif %}" aria-label="Save post"><svg class="icon-sm"><use href="#i-bookmark"/></svg></button>
@@ -78,12 +93,15 @@
         <summary class="action" aria-label="More options"><svg class="icon-sm"><use href="#i-more"/></svg></summary>
         <div class="menu-panel">
           {% if post.author_id == user.pk %}
+          {% if not post.removed_by_moderator %}<a class="menu-item" href="{% url 'posts:edit' post.pk %}">Edit post</a>{% endif %}
+          {% if post.edited_at %}<a class="menu-item" href="{% url 'posts:history' post.pk %}">Edit history</a>{% endif %}
           <form method="post" action="{% url 'posts:delete' post.pk %}" data-confirm="Delete this post? This can't be undone.">
             {% csrf_token %}<button type="submit" class="menu-item danger">Delete post</button>
           </form>
           {% else %}
           <a class="menu-item" href="{% url 'moderation:report' 'post' post.pk %}?next={{ request.get_full_path|urlencode }}">Report post</a>
           {% endif %}
+          {% if is_moderator and post.author_id != user.pk and post.edited_at %}<a class="menu-item" href="{% url 'posts:history' post.pk %}">Edit history</a>{% endif %}
           {% if is_moderator and post.author_id != user.pk %}
           <form method="post" action="{% url 'moderation:action' %}" data-confirm="Remove this post for everyone? The author loses 20 NexScore.">
             {% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="target_type" value="post"><input type="hidden" name="target_id" value="{{ post.pk }}">

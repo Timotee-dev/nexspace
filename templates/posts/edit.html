@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+{% block title %}Edit post{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ post.get_absolute_url }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back to post</a></div>
+<div class="page-head"><h1>Edit post</h1><p>Your post will show "Edited". Earlier versions are kept so moderators can check what changed.</p></div>
+<form method="post" class="form panel stack">
+  {% csrf_token %}
+  {% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+  {% if post.title or post.kind == "event" or post.kind == "opportunity" %}
+  <div class="field"><label for="edit-title">Title</label><input id="edit-title" name="title" maxlength="150" value="{{ post.title }}"></div>
+  {% endif %}
+  <div class="field"><label for="edit-body">{% if post.kind == "poll" %}Poll question{% elif post.kind == "question" %}Your question{% else %}Post{% endif %}</label>
+    <textarea id="edit-body" name="body" rows="7" maxlength="2000" data-count="edit-count" {% if poll_locked %}readonly{% endif %}>{{ body }}</textarea>
+    <p class="field-help"><span id="edit-count"></span>{% if poll_locked %} · People have voted, so the question is locked.{% endif %}</p></div>
+  {% if post.kind != "poll" %}
+  <fieldset class="field"><legend>Topics <span class="optional">(up to 3)</span></legend>
+    <ul class="chips" data-max-topics="3">{% for t in topics %}<li><label class="chip"><input type="checkbox" name="topics" value="{{ t.pk }}"{% if t.pk in chosen %} checked{% endif %}><span>{{ t.name }}</span></label></li>{% endfor %}</ul></fieldset>
+  {% endif %}
+  <p class="small muted">Attachments, anonymity and where it was posted can't be changed. To change those, delete the post and post again.</p>
+  <div class="form-actions"><a class="btn btn-quiet" href="{{ post.get_absolute_url }}">Cancel</a><button type="submit" class="btn btn-primary">Save changes</button></div>
+</form>
+{% endblock %}

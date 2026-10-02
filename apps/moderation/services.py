@@ -15,13 +15,15 @@ from apps.reputation import services as nexscore
 from apps.resources.models import Resource
 from apps.spaces.models import Space
 
+from apps.messaging.models import Message
+
 from .models import ModerationAction, Report, TargetType
 
 AUTO_HIDE_THRESHOLD = 5
 REPORT_RATE = (20, 60 * 60)
 MODELS = {TargetType.POST: Post, TargetType.COMMENT: Comment, TargetType.RESOURCE: Resource,
-          TargetType.USER: User, TargetType.SPACE: Space}
-HIDEABLE = {TargetType.POST, TargetType.COMMENT, TargetType.RESOURCE}
+          TargetType.USER: User, TargetType.SPACE: Space, TargetType.MESSAGE: Message}
+HIDEABLE = {TargetType.POST, TargetType.COMMENT, TargetType.RESOURCE, TargetType.MESSAGE}
 
 
 def load_target(target_type, target_id):
@@ -38,6 +40,7 @@ def target_department_id(target_type, obj):
         TargetType.RESOURCE: lambda o: o.course.department_id,
         TargetType.USER: lambda o: o.department_id,
         TargetType.SPACE: lambda o: o.department_id,
+        TargetType.MESSAGE: lambda o: o.conversation.department_id,
     }[target_type](obj)
 
 
@@ -46,6 +49,7 @@ def target_owner(target_type, obj):
         TargetType.POST: lambda o: o.author, TargetType.COMMENT: lambda o: o.author,
         TargetType.RESOURCE: lambda o: o.uploaded_by, TargetType.USER: lambda o: o,
         TargetType.SPACE: lambda o: o.created_by,
+        TargetType.MESSAGE: lambda o: o.sender,
     }[target_type](obj)
 
 
@@ -58,6 +62,8 @@ def label(target_type, obj):
         return obj.title[:80]
     if target_type == TargetType.USER:
         return f"@{obj.username}"
+    if target_type == TargetType.MESSAGE:
+        return f"Message: {obj.body[:70]}" if obj.body else f"Message #{obj.pk}"
     return obj.name
 
 
@@ -77,6 +83,8 @@ def submit_report(*, reporter, target_type, target_id, reason, details=""):
     obj = load_target(target_type, target_id)
     if obj is None or target_department_id(target_type, obj) != reporter.department_id:
         raise ValidationError("That content can't be reported.")
+    if target_type == TargetType.MESSAGE and not obj.conversation.members.filter(user=reporter).exists():
+        raise ValidationError("That content can't be reported.")  # only the people in the conversation
     owner = target_owner(target_type, obj)
     if owner is not None and owner.pk == reporter.pk:
         raise ValidationError("You can't report your own content.")
@@ -179,6 +187,8 @@ def remove_content(*, moderator, target_type, target_id, note=""):
         Post.objects.filter(pk=obj.post_id, comment_count__gt=0).update(comment_count=F("comment_count") - 1)
     elif target_type == TargetType.RESOURCE:
         obj.is_removed = True
+    elif target_type == TargetType.MESSAGE:
+        obj.is_deleted = True
     if hasattr(obj, "removed_by_moderator"):
         obj.removed_by_moderator = True
     obj.is_hidden = False

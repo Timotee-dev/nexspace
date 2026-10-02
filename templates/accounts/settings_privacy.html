@@ -6,9 +6,11 @@
 <form method="post" class="form panel">
   {% csrf_token %}
   {% include "partials/field.html" with field=form.visibility %}
+  {% include "partials/field.html" with field=form.allow_messages_from %}
+  <p class="field-help">Your department admins can still message you about official matters, unless you block them.</p>
   <div>
     <h2 class="section-title">Show on my profile</h2>
-    {% for field in form %}{% if field.name != "visibility" %}
+    {% for field in form %}{% if field.name != "visibility" and field.name != "allow_messages_from" %}
     <label class="toggle-row" for="{{ field.id_for_label }}">
       <span>{{ field.label }}</span>
       <span class="switch">{{ field }}<span></span></span>
@@ -18,4 +20,10 @@
   <p class="field-help">Your email address and moderation history are never shown to other students. Read the full <a href="{% url 'core:privacy' %}">privacy notice</a>.</p>
   <div class="form-actions"><button type="submit" class="btn btn-primary">Save privacy settings</button></div>
 </form>
+<section class="panel" style="margin-top:16px">
+  <h2 class="section-title">Blocked people</h2>
+  {% if blocked %}<ul class="member-list">{% for b in blocked %}<li class="request-row"><span><b>{{ b.blocked.full_name }}</b> <span class="muted small">@{{ b.blocked.username }}</span></span>
+    <form method="post" action="{% url 'messaging:block' b.blocked.username %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-ghost btn-sm">Unblock</button></form></li>{% endfor %}</ul>
+  {% else %}<p class="muted small">You haven't blocked anyone. Blocking someone stops either of you messaging the other.</p>{% endif %}
+</section>
 {% endblock %}

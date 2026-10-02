@@ -87,7 +87,10 @@ def run_all():
     # 7. Housekeeping
     deleted, _ = Notification.objects.filter(is_read=True, created_at__lt=now - timedelta(days=90)).delete()
 
-    result = {**counts, "indexed": indexed, "push": push, "cleaned": deleted}
+    from apps.notifications.digest import send_due_digests
+
+    digests = send_due_digests(now)
+    result = {**counts, "indexed": indexed, "push": push, "cleaned": deleted, "digests": digests}
     from django.core.cache import cache
 
     cache.set("last-scheduled-run", {"at": now.isoformat(), "result": result}, None)

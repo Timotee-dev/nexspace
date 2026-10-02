@@ -46,12 +46,12 @@
   </aside>
 
   <nav class="bottomnav mobile-only" aria-label="Main">
-    {% url 'core:home' as home_url %}{% url 'discover:explore' as explore_url %}{% url 'posts:compose' as compose_url %}{% url 'spaces:list' as spaces_url %}{% url 'accounts:profile' user.username as profile_url %}
+    {% url 'core:home' as home_url %}{% url 'discover:explore' as explore_url %}{% url 'posts:compose' as compose_url %}{% url 'spaces:list' as spaces_url %}{% url 'messaging:inbox' as dm_url %}
     <a href="{{ home_url }}" {% if path == home_url %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-home"/></svg>Home</a>
     <a href="{{ explore_url }}" {% if explore_url in path or "/opportunities/" in path or "/groups/" in path or "/resources/" in path or "/calendar/" in path or "/announcements/" in path %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-compass"/></svg>Explore</a>
     <a href="{{ compose_url }}" class="bottomnav-create" {% if path == compose_url %}aria-current="page"{% endif %} aria-label="Create"><span><svg class="icon"><use href="#i-plus"/></svg></span></a>
     <a href="{{ spaces_url }}" {% if spaces_url in path or "/s/" in path or "/courses/" in path %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-layers"/></svg>Spaces</a>
-    <a href="{{ profile_url }}" {% if path == profile_url %}aria-current="page"{% endif %}><svg class="icon"><use href="#i-user"/></svg>Profile</a>
+    <a href="{{ dm_url }}" {% if dm_url in path %}aria-current="page"{% endif %}><span class="icon-wrap"><svg class="icon"><use href="#i-message"/></svg><span class="badge" data-unread-messages{% if not unread_messages %} hidden{% endif %}>{% if unread_messages > 99 %}99+{% else %}{{ unread_messages }}{% endif %}</span></span>Messages</a>
   </nav>
 </div>
 {% endwith %}

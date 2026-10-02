@@ -66,7 +66,7 @@ def search(user, q, *, only=None, limit=5):
         results["resources"] = list(Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
                                     .filter(_all_words(words, "title", "description", "course__code", "course__title"))
                                     .order_by("-download_count")[:limit])
-    base_posts = Post.objects.for_viewer(user).with_related()
+    base_posts = Post.objects.for_viewer(user).with_related().exclude(kind=Post.Kind.REPOST)
     if want("posts"):
         results["posts"] = list(base_posts.exclude(kind=Post.Kind.OPPORTUNITY)
                                 .filter(_all_words(words, "title", "body", "space__name", "topics__slug"))

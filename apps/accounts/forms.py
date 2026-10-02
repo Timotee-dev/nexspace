@@ -220,14 +220,22 @@ class ProfileForm(forms.Form):
 class PrivacyForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ["visibility", "show_matric_number", "show_social_links", "show_joined_spaces"]
-        widgets = {"visibility": forms.RadioSelect}
+        fields = ["visibility", "allow_messages_from", "show_matric_number", "show_social_links", "show_joined_spaces"]
+        widgets = {"visibility": forms.RadioSelect, "allow_messages_from": forms.RadioSelect}
         labels = {
             "visibility": "Who can see your profile",
+            "allow_messages_from": "Who can send you direct messages",
             "show_matric_number": "Show my matric number on my profile",
             "show_social_links": "Show my GitHub, LinkedIn and portfolio links",
             "show_joined_spaces": "Show the Spaces I've joined",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["allow_messages_from"].required = False
+
+    def clean_allow_messages_from(self):
+        return self.cleaned_data.get("allow_messages_from") or self.instance.allow_messages_from
 
 
 class AppearanceForm(forms.ModelForm):

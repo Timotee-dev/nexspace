@@ -7,6 +7,7 @@ class Category(models.TextChoices):
     ACADEMIC = "academic", "Academic"
     DEPARTMENT = "department", "Department"
     OPPORTUNITIES = "opportunities", "Opportunities"
+    MESSAGES = "messages", "Messages"
 
 
 class Notification(models.Model):
@@ -25,6 +26,8 @@ class Notification(models.Model):
         STUDY_GROUP = "study_group", "Study group"
         SPACE_REQUEST = "space_request", "Space join request"
         STAFF = "staff", "Staff verification"
+        REPOST = "repost", "Repost"
+        MESSAGE = "message", "Direct message"
 
     class PushStatus(models.TextChoices):
         NONE = "none", "Not sent"
@@ -72,6 +75,16 @@ class NotificationPreference(models.Model):
     department_push = models.BooleanField(default=True)
     opportunities_in_app = models.BooleanField(default=True)
     opportunities_push = models.BooleanField(default=False)
+    messages_in_app = models.BooleanField(default=True)
+    messages_push = models.BooleanField(default=True)
+
+    class Digest(models.TextChoices):
+        OFF = "off", "Off"
+        DAILY = "daily", "Daily"
+        WEEKLY = "weekly", "Weekly (Mondays)"
+
+    digest = models.CharField(max_length=8, choices=Digest.choices, default=Digest.WEEKLY,
+                              help_text="Summary email of what you missed")
 
     def allows(self, category, channel):
         return getattr(self, f"{category}_{channel}")
@@ -85,3 +98,15 @@ class PushSubscription(models.Model):
     user_agent = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_success_at = models.DateTimeField(null=True, blank=True)
+
+
+class DigestLog(models.Model):
+    """One row per digest sent, so each period's digest goes out at most once."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="digests")
+    period = models.CharField(max_length=20, help_text='e.g. "daily:2026-10-05" or "weekly:2026-W41"')
+    emailed = models.BooleanField(default=True, help_text="False when there was nothing new to send")
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "period"], name="one_digest_per_period")]

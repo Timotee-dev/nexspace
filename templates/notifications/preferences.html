@@ -18,6 +18,11 @@
       {% endfor %}
     </tbody>
   </table>
+  <fieldset class="field">
+    <legend>Summary email</legend>
+    <p class="field-help">A short email with what you missed: upcoming exams and deadlines, unread messages, new course materials and popular posts. Only sent when there's something new.</p>
+    <div class="kind-picker">{% for value, label in digest_choices %}<label class="kind-option"><input type="radio" name="digest" value="{{ value }}"{% if digest == value %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
+  </fieldset>
   <p class="field-help">Critical notifications — urgent or important announcements, exam and test reminders, and deadline reminders you set — always appear in the app.</p>
   <div class="form-actions"><button type="submit" class="btn btn-primary">Save notification settings</button></div>
 </form>

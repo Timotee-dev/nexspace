@@ -1,0 +1,12 @@
+{% load nexspace %}
+{# Quoted post inside another post. Context: original #}
+{% if not original or original.is_deleted or original.is_hidden or original.space.requires_approval %}
+<div class="embed embed-gone">This post isn't available.</div>
+{% else %}
+<a class="embed" href="{{ original.get_absolute_url }}">
+  <span class="embed-head">{% if original.is_anonymous %}<b>Anonymous Student</b>{% else %}<b>{{ original.author.display_name }}</b>{% endif %} <span class="muted">· {{ original.created_at|ago }}</span></span>
+  {% if original.title %}<b class="embed-title">{{ original.title }}</b>{% endif %}
+  {% if original.body %}<span class="embed-body">{{ original.body|truncatechars:280 }}</span>{% endif %}
+  {% with first=original.images.0 %}{% if first %}<img src="{% url 'posts:attachment' original.pk first.pk %}" alt="Image attached to the quoted post" loading="lazy">{% endif %}{% endwith %}
+</a>
+{% endif %}

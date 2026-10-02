@@ -35,7 +35,8 @@
 </div>
 {% endif %}
 {% endif %}
-<div class="feed" data-feed>
+<div class="live-pill" data-live-pill hidden><button type="button" class="btn btn-primary btn-sm" data-live-refresh>Show new posts</button></div>
+<div class="feed" data-feed data-live-feed="{{ tab }}" data-max-id="{{ max_post_id }}">
   {% if posts %}
     {% include "posts/_feed_page.html" %}
   {% else %}

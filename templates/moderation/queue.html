@@ -18,6 +18,8 @@
         <div class="post-body">{{ item.obj.body|truncatechars:400|render_body }}</div><a class="small" href="{{ item.obj.post.get_absolute_url }}#c-{{ item.obj.pk }}">Open in context</a>
       {% elif item.target_type == "resource" %}
         <b>{{ item.obj.title }}</b> <a class="small" href="{{ item.obj.get_absolute_url }}">Open resource</a>
+      {% elif item.target_type == "message" %}
+        <p class="small muted">Direct message, shown to moderators because it was reported:</p><blockquote class="reported-message">{{ item.obj.body|default:"[deleted]" }}</blockquote>
       {% elif item.target_type == "user" %}
         <a href="{% url 'accounts:profile' item.obj.username %}"><b>{{ item.obj.full_name }}</b> @{{ item.obj.username }}</a>
       {% else %}

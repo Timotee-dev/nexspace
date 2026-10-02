@@ -7,7 +7,11 @@
     <div class="profile-top">
       {% include "partials/avatar.html" with person=profile_user size_class="avatar-xl" %}
       {% if is_owner %}<a class="btn btn-ghost" href="{% url 'accounts:settings-profile' %}">Edit profile</a>
-      {% else %}{% include "partials/follow_button.html" with kind="user" key=profile_user.username following=is_following %}{% endif %}
+      {% else %}<div class="profile-actions">
+        {% if can_message %}<form method="post" action="{% url 'messaging:start' profile_user.username %}">{% csrf_token %}<button class="btn btn-ghost" aria-label="Message {{ profile_user.full_name }}"><svg class="icon-sm"><use href="#i-message"/></svg>Message</button></form>{% endif %}
+        {% include "partials/follow_button.html" with kind="user" key=profile_user.username following=is_following %}
+        <form method="post" action="{% url 'messaging:block' profile_user.username %}"{% if not has_blocked %} data-confirm="Block {{ profile_user.full_name }}? Neither of you will be able to message the other."{% endif %}>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-quiet btn-sm">{% if has_blocked %}Unblock{% else %}Block{% endif %}</button></form>
+      </div>{% endif %}
     </div>
     <div class="profile-name">
       <h1 id="profile-name">{{ profile_user.display_name }}{% if staff %} <span class="tag tag-staff">{{ staff.get_position_display }}</span>{% endif %}</h1>

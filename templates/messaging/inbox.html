@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Messages</h1><p>Private conversations with people in your department. To start one, open someone's profile and tap <b>Message</b>.</p></div>
+{% if rows %}
+<ul class="inbox">
+  {% for row in rows %}{% with other=row.other conv=row.conversation last=row.last %}
+  <li><a class="inbox-row{% if row.unread %} is-unread{% endif %}" href="{{ conv.get_absolute_url }}">
+    {% if other %}{% include "partials/avatar.html" with person=other %}{% endif %}
+    <span class="inbox-text">
+      <span class="inbox-top"><b>{% if other %}{{ other.display_name }}{% else %}Deleted user{% endif %}</b>{% if row.muted %} <span class="muted small" aria-label="muted">🔕</span>{% endif %}<span class="muted small">{{ conv.last_message_at|ago }}</span></span>
+      <span class="inbox-preview">{% if last.sender_id == user.pk %}You: {% endif %}{% if last.is_deleted or last.is_hidden %}<i>Message deleted</i>{% else %}{{ last.body|truncatechars:90 }}{% endif %}</span>
+    </span>
+    {% if row.unread %}<span class="unread-dot" aria-label="Unread"></span>{% endif %}
+  </a></li>
+  {% endwith %}{% endfor %}
+</ul>
+{% else %}
+<div class="empty"><p style="font-size:2rem" aria-hidden="true">✉️</p><h2>No messages yet</h2><p>Open a classmate's or lecturer's profile and tap <b>Message</b> to start a conversation.</p><a class="btn btn-ghost" href="{% url 'search:search' %}">Find people</a></div>
+{% endif %}
+{% endblock %}

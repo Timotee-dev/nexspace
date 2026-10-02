@@ -10,7 +10,7 @@
     {% else %}<span class="comment-author">{% include "partials/avatar.html" with person=comment.author size_class="avatar-sm" %}<b>{{ comment.author.full_name }}</b></span>{% endif %}
     {% if comment.author_id == post.author_id and not post.is_anonymous %}<span class="tag">Author</span>{% endif %}
     {% if post.accepted_comment_id == comment.pk %}<span class="tag tag-solved">Accepted answer</span>{% endif %}
-    <time class="muted small" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|ago }}</time>
+    <time class="muted small" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|ago }}</time>{% if comment.edited_at %}<span class="edited" title="Edited {{ comment.edited_at|date:'j M Y, H:i' }}">· Edited</span>{% endif %}
   </div>
   <div class="comment-body">{% if comment.reply_to %}<a class="mention" href="{% url 'accounts:profile' comment.reply_to.username %}">@{{ comment.reply_to.username }}</a> {% endif %}{{ comment.body|render_body }}</div>
   <div class="comment-actions">
@@ -20,6 +20,7 @@
     <form method="post" action="{% url 'posts:accept' comment.pk %}">{% csrf_token %}<button type="submit" class="action">{% if post.accepted_comment_id == comment.pk %}Unaccept{% else %}Accept answer{% endif %}</button></form>
     {% endif %}
     {% if comment.author_id == user.pk %}
+    {% if not comment.removed_by_moderator %}<a class="action" href="{% url 'posts:comment-edit' comment.pk %}">Edit</a>{% endif %}
     <form method="post" action="{% url 'posts:comment-delete' comment.pk %}" data-confirm="Delete this comment?">{% csrf_token %}<button type="submit" class="action">Delete</button></form>
     {% else %}
     <a class="action" href="{% url 'moderation:report' 'comment' comment.pk %}?next={{ request.get_full_path|urlencode }}">Report</a>

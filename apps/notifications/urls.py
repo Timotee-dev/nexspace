@@ -9,6 +9,7 @@ urlpatterns = [
     path("notifications/<int:pk>/open/", views.open_view, name="open"),
     path("notifications/read-all/", views.mark_all_view, name="mark-all"),
     path("settings/notifications/", views.preferences_view, name="preferences"),
+    path("email/unsubscribe/<str:token>/", views.digest_unsubscribe_view, name="digest-unsubscribe"),
 ]
 
 api_urlpatterns = [

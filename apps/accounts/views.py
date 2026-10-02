@@ -244,6 +244,8 @@ def profile_detail_view(request, username):
         "following_count": profile_user.following_set.count(),
         "is_following": UserFollow.objects.filter(follower=request.user, following=profile_user).exists(),
         "staff": profile_user.staff if profile_user.is_verified_staff else None,
+        "can_message": not is_owner and _can_message(request.user, profile_user),
+        "has_blocked": not is_owner and _has_blocked(request.user, profile_user),
         "taught": list(profile_user.role_assignments.filter(role="lecturer").select_related("course"))
         if profile_user.is_verified_staff else [],
     }
@@ -251,7 +253,9 @@ def profile_detail_view(request, username):
         posts = Post.objects.for_viewer(request.user).with_related().filter(author=profile_user)
         if not is_owner:
             posts = posts.filter(is_anonymous=False)  # anonymous posts never appear on a public profile
-        context["posts"] = list(annotate_for_user(posts, request.user)[:30])
+        from apps.posts.feed import expand_reposts
+
+        context["posts"] = expand_reposts(list(annotate_for_user(posts, request.user)[:30]), request.user)
     elif tab == "replies":
         visible_posts = Post.objects.for_viewer(request.user).values("pk")  # respects private Spaces
         context["replies"] = list(
@@ -298,7 +302,10 @@ def settings_privacy_view(request):
         form.save()
         messages.success(request, "Privacy settings saved.")
         return redirect("accounts:settings-privacy")
-    return render(request, "accounts/settings_privacy.html", {"form": form, "section": "privacy"})
+    from apps.messaging.models import Block
+
+    blocked = Block.objects.filter(blocker=request.user).select_related("blocked")
+    return render(request, "accounts/settings_privacy.html", {"form": form, "section": "privacy", "blocked": blocked})
 
 
 @login_required
@@ -342,3 +349,16 @@ def delete_account_view(request):
     logout(request)
     messages.success(request, "Your account has been deleted. Thanks for being part of NexSpace.")
     return redirect("core:home")
+
+
+
+def _can_message(sender, recipient):
+    from apps.messaging.services import can_message
+
+    return can_message(sender, recipient)[0]
+
+
+def _has_blocked(user, other):
+    from apps.messaging.services import has_blocked
+
+    return has_blocked(user, other)

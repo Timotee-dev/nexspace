@@ -50,6 +50,8 @@ Dashboard → copy the **API environment variable** (`cloudinary://...`). That's
 | `ANTHROPIC_API_KEY` | optional — turns on NexAI's written answers |
 | `CRON_SECRET` | optional — enables the free scheduler URL (section 5b) |
 | `PLATFORM_OWNER_EMAILS` | optional — defaults to `arifalotimothy@gmail.com`; comma-separate to add more owners |
+| `DIGEST_DAILY_CAP` | optional — most summary emails per day (default 250; Brevo free allows 300 in total) |
+| `DIGEST_HOUR` | optional — local hour digests start going out (default 7) |
 | `STAFF_VERIFICATION` | optional — `platform` (default: you verify all staff) or `department` (HODs verify) |
 
 `SECRET_KEY` is generated for you. `DEBUG` is already `False`.
@@ -70,7 +72,7 @@ Render cron jobs cost at least $1/month. Instead, let a free scheduler call NexS
    - Save, then use **Test run**. You should get `{"status": "ok", ...}`.
 3. If you use this, delete the `- type: cron` block from `render.yaml` (or don't create the cron job).
 
-This sends exam and deadline reminders, delivers push notifications, reads new uploads for NexAI and recomputes trending. The URL returns "not found" to anyone without the secret. On the free plan the first call after a quiet period may time out while the server wakes up; the next one works.
+This sends exam and deadline reminders, the weekly summary emails, delivers push notifications, reads new uploads for NexAI and recomputes trending. The URL returns "not found" to anyone without the secret. On the free plan the first call after a quiet period may time out while the server wakes up; the next one works.
 
 ## 6. First-time setup (Render → web service → Shell)
 

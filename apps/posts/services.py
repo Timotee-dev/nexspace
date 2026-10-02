@@ -17,7 +17,7 @@ from apps.reputation import rules
 from apps.reputation import services as nexscore
 
 from .models import (
-    MAX_COMMENT_DEPTH, MAX_TOPICS, Attachment, Bookmark, Comment, CommentVote, EventDetails,
+    COMMENT_MAX, MAX_COMMENT_DEPTH, MAX_TOPICS, Attachment, Bookmark, Comment, CommentVote, EventDetails,
     OpportunityDetails, Poll, PollOption, PollVote, Post, PostVote,
 )
 
@@ -28,6 +28,8 @@ MAX_FILES = 3
 POST_RATE = (10, 10 * 60)      # 10 posts per 10 minutes
 COMMENT_RATE = (30, 10 * 60)   # 30 comments per 10 minutes
 VOTE_RATE = (60, 60)           # 60 votes per minute
+EDIT_RATE = (30, 10 * 60)      # 30 edits per 10 minutes
+REPOST_RATE = (30, 10 * 60)    # 30 reposts per 10 minutes
 
 
 class RateLimited(Exception):
@@ -171,6 +173,8 @@ def delete_post(*, user, post):
     post.is_deleted = True
     post.deleted_at = timezone.now()
     post.save(update_fields=["is_deleted", "deleted_at"])
+    if post.repost_of_id:
+        Post.objects.filter(pk=post.repost_of_id, repost_count__gt=0).update(repost_count=F("repost_count") - 1)
     nexscore.reverse(source=post)
     for comment in post.comments.all():
         nexscore.reverse(source=comment)
@@ -346,3 +350,133 @@ def toggle_bookmark(*, user, post) -> bool:
     except IntegrityError:
         pass
     return True
+
+
+
+# --- Editing ----------------------------------------------------------------
+def _check_editable(user, item, what):
+    if item.author_id != user.pk:
+        raise PermissionDenied(f"You can only edit your own {what}s.")
+    if item.is_deleted:
+        raise ValidationError(f"This {what} was deleted.")
+    if item.removed_by_moderator:
+        raise PermissionDenied(f"A moderator removed this {what}, so it can't be edited.")
+    require_verified(user)
+    _limit(user, "edit", EDIT_RATE)
+
+
+@transaction.atomic
+def edit_post(*, user, post, body, title=None, topics=None):
+    """Change a post's text (and title/topics). The previous version is kept as a PostRevision so
+    moderators can see what a reported post used to say. Kind, anonymity, Space, attachments and
+    poll options never change; a poll's question is locked once anyone has voted."""
+    from .models import PostRevision
+
+    _check_editable(user, post, "post")
+    if post.kind == Post.Kind.REPOST:
+        raise ValidationError("Plain reposts have nothing to edit. Undo the repost instead.")
+    body = (body or "").strip()
+    title = post.title if title is None else (title or "").strip()
+    if post.kind in (Post.Kind.POST, Post.Kind.QUESTION) and not body and not post.attachments.exists() \
+            and not post.repost_of_id:
+        raise ValidationError("A post can't be empty.")
+    if post.kind == Post.Kind.POLL:
+        if not body:
+            raise ValidationError("Ask your poll question.")
+        if body != post.body and post.poll.votes.exists():
+            raise ValidationError("People have already voted, so the poll question can't change.")
+    if post.kind in (Post.Kind.EVENT, Post.Kind.OPPORTUNITY) and not title:
+        raise ValidationError("Give it a title.")
+    if len(body) > Post._meta.get_field("body").max_length:
+        raise ValidationError("That's too long.")
+    if topics is not None:
+        topics = list(topics)
+        if len(topics) > MAX_TOPICS:
+            raise ValidationError(f"Pick up to {MAX_TOPICS} topics.")
+    changed = body != post.body or title != post.title
+    if changed:
+        PostRevision.objects.create(post=post, title=post.title, body=post.body)
+        before = set(post.mentions.values_list("pk", flat=True))
+        post.body, post.title, post.edited_at = body, title[:150], timezone.now()
+        post.save(update_fields=["body", "title", "edited_at", "updated_at"])
+        mentioned = extract_mentions(f"{title} {body}", exclude=user)
+        post.mentions.set(mentioned)
+        new = [u for u in mentioned if u.pk not in before]
+        if new:
+            from apps.notifications import services as notifications
+
+            notifications.mentioned_in_edit(post, new)
+    if topics is not None:
+        post.topics.set(topics)
+    return post
+
+
+@transaction.atomic
+def edit_comment(*, user, comment, body):
+    from .models import CommentRevision
+
+    _check_editable(user, comment, "comment")
+    body = (body or "").strip()
+    if not body:
+        raise ValidationError("A comment can't be empty.")
+    if len(body) > COMMENT_MAX:
+        raise ValidationError("That's too long.")
+    if body == comment.body:
+        return comment
+    CommentRevision.objects.create(comment=comment, body=comment.body)
+    comment.body, comment.edited_at = body, timezone.now()
+    comment.save(update_fields=["body", "edited_at"])
+    comment.mentions.set(extract_mentions(body, exclude=user))
+    return comment
+
+
+# --- Reposts ----------------------------------------------------------------
+def can_repost(user, post) -> bool:
+    original = post.repost_of if post.kind == Post.Kind.REPOST and post.repost_of_id else post
+    if original is None or original.is_deleted or original.is_hidden or not can_view(user, original):
+        return False
+    return not (original.space_id and original.space.requires_approval)  # private Spaces stay private
+
+
+@transaction.atomic
+def repost(*, user, post, quote=""):
+    """Repost (quote empty) or quote-post `post`. Reposting a repost reposts the original."""
+    require_verified(user)
+    if post.kind == Post.Kind.REPOST and post.repost_of_id:
+        post = post.repost_of
+    if not can_repost(user, post):
+        raise PermissionDenied("This post can't be reposted. Posts in private Spaces stay inside their Space.")
+    quote = (quote or "").strip()
+    if not quote and Post.objects.filter(author=user, repost_of=post, kind=Post.Kind.REPOST, is_deleted=False).exists():
+        raise ValidationError("You've already reposted this.")
+    _limit(user, "repost", REPOST_RATE)
+    new = Post.objects.create(
+        author=user, department_id=user.department_id, kind=Post.Kind.POST if quote else Post.Kind.REPOST,
+        body=quote, repost_of=post,
+    )
+    if quote:
+        new.mentions.set(extract_mentions(quote, exclude=user))
+    Post.objects.filter(pk=post.pk).update(repost_count=F("repost_count") + 1)
+    from apps.notifications import services as notifications
+
+    notifications.reposted(new)
+    if quote:
+        notifications.post_created(new)
+    return new
+
+
+@transaction.atomic
+def undo_repost(*, user, post):
+    original = post.repost_of if post.kind == Post.Kind.REPOST and post.repost_of_id else post
+    mine = Post.objects.filter(author=user, repost_of=original, kind=Post.Kind.REPOST, is_deleted=False).first()
+    if mine is None:
+        return False
+    delete_post(user=user, post=mine)
+    return True
+
+
+def reposted_ids(user, posts) -> set:
+    """Which of these posts (or their originals) the user has plainly reposted."""
+    ids = {p.repost_of_id if p.kind == Post.Kind.REPOST and p.repost_of_id else p.pk for p in posts}
+    return set(Post.objects.filter(author=user, kind=Post.Kind.REPOST, is_deleted=False, repost_of_id__in=ids)
+               .values_list("repost_of_id", flat=True))

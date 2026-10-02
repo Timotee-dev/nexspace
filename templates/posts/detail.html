@@ -4,7 +4,8 @@
 <div class="back-row"><a class="btn btn-quiet" href="{% url 'core:home' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Back</a></div>
 {% include "posts/_post_card.html" with detail=True %}
 
-<section class="comments" id="comments" aria-labelledby="comments-title">
+<section class="comments" id="comments" aria-labelledby="comments-title" data-live-comments="{{ post.pk }}" data-max-comment="{{ max_comment_id }}">
+  <div class="live-pill" data-live-pill hidden><button type="button" class="btn btn-primary btn-sm" data-live-refresh>Show new comments</button></div>
   <h2 id="comments-title" class="comments-title">{% if post.kind == "question" %}Answers{% else %}Comments{% endif %} <span class="muted">{{ post.comment_count }}</span></h2>
   {% if user.can_write %}
   <form method="post" action="{% url 'posts:comment' post.pk %}" class="comment-form">

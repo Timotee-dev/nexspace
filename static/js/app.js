@@ -194,32 +194,6 @@ document.addEventListener("click", async (event) => {
   button.hidden = true;
 });
 
-// ---------- Unread notifications badge (polls every 60s while the tab is visible) ----------
-async function refreshBadge() {
-  const badges = document.querySelectorAll("[data-unread]");
-  if (!badges.length || document.hidden) return;
-  try {
-    const { unread } = await api("/api/notifications/unread-count/");
-    badges.forEach((b) => { b.textContent = unread > 99 ? "99+" : String(unread); b.hidden = unread === 0; });
-  } catch { /* offline or signed out */ }
-}
-if (document.body.dataset.authenticated === "true") {
-  setInterval(refreshBadge, 60000);
-  document.addEventListener("visibilitychange", refreshBadge);
-}
-
-// Sign-up: only show courses from the department the person picked
-const deptSelect = document.querySelector('.signup-form select[name="department"]');
-if (deptSelect) {
-  const syncCourses = () => {
-    document.querySelectorAll(".course-picks [data-dept]").forEach((label) => {
-      label.hidden = deptSelect.value !== "" && label.dataset.dept !== deptSelect.value;
-    });
-  };
-  deptSelect.addEventListener("change", syncCourses);
-  syncCourses();
-}
-
 // ---------- Phones: slide-in sidebar (tap your photo, or swipe right; swipe left to close) ----------
 (() => {
   const drawer = document.getElementById("app-sidebar");
@@ -296,3 +270,218 @@ if (deptSelect) {
     if (isOpen()) { if (fast || far) close(); } else if (fast || far) open();
   });
 })();
+
+// ---------- Live updates (no page refresh; checks only while the tab is visible) ----------
+function onVisibleInterval(fn, ms) {
+  let timer = null;
+  const start = () => { if (!timer) timer = setInterval(() => { if (!document.hidden) fn(); }, ms); };
+  const stop = () => { clearInterval(timer); timer = null; };
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else { fn(); start(); } });
+  start();
+}
+
+function setBadges(selector, count) {
+  document.querySelectorAll(selector).forEach((b) => {
+    b.textContent = count > 99 ? "99+" : String(count);
+    b.hidden = count === 0;
+  });
+}
+
+if (document.body.dataset.authenticated === "true") {
+  onVisibleInterval(async () => {
+    try {
+      const r = await fetch("/live/", { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!r.ok) return;
+      const { notifications, messages } = await r.json();
+      setBadges("[data-unread]", notifications);
+      setBadges("[data-unread-messages]", messages);
+    } catch { /* offline */ }
+  }, 15000);
+}
+
+// "Show new posts" / "Show new comments" bars
+(() => {
+  const feedEl = document.querySelector("[data-live-feed]");
+  const commentsEl = document.querySelector("[data-live-comments]");
+  const target = feedEl || commentsEl;
+  if (!target) return;
+  const pill = (feedEl ? document : commentsEl).querySelector("[data-live-pill]");
+  const button = pill?.querySelector("[data-live-refresh]");
+  const url = feedEl
+    ? () => `/live/feed/?tab=${encodeURIComponent(feedEl.dataset.liveFeed)}&after=${feedEl.dataset.maxId || 0}`
+    : () => `/live/post/${commentsEl.dataset.liveComments}/?after=${commentsEl.dataset.maxComment || 0}`;
+  onVisibleInterval(async () => {
+    try {
+      const r = await fetch(url(), { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!r.ok) return;
+      const { new: count } = await r.json();
+      if (count > 0 && pill) {
+        button.textContent = feedEl ? `Show ${count} new post${count > 1 ? "s" : ""}`
+          : `Show ${count} new comment${count > 1 ? "s" : ""}`;
+        pill.hidden = false;
+      }
+    } catch { /* offline */ }
+  }, feedEl ? 30000 : 15000);
+  button?.addEventListener("click", () => {
+    if (feedEl) { window.scrollTo({ top: 0 }); location.reload(); }
+    else { location.hash = "comments"; location.reload(); }
+  });
+})();
+
+// ---------- Live chat ----------
+(() => {
+  const page = document.querySelector("[data-chat]");
+  if (!page) return;
+  const id = page.dataset.chat;
+  const log = page.querySelector(".chat-log");
+  const latest = log.querySelector("#latest");
+  const form = page.querySelector("[data-chat-form]");
+  const box = form?.querySelector("textarea");
+  let lastId = Number(page.dataset.lastId || 0);
+  const firstId = Number(page.dataset.firstId || 0);
+  const csrf = () => document.querySelector("input[name=csrfmiddlewaretoken]")?.value || "";
+
+  const nearBottom = () => window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
+  const toBottom = () => latest.scrollIntoView({ block: "end" });
+  toBottom();
+
+  function bubble(m) {
+    if (document.getElementById(`m-${m.id}`)) return;
+    log.querySelector(".chat-empty")?.remove();
+    const row = document.createElement("li");
+    row.className = `bubble-row${m.mine ? " mine" : ""}`;
+    row.id = `m-${m.id}`;
+    row.dataset.id = m.id;
+    const div = document.createElement("div");
+    div.className = `bubble${m.deleted ? " bubble-deleted" : ""}`;
+    if (m.deleted) div.innerHTML = "<i>Message deleted</i>";
+    else div.innerHTML = m.html;  // server-escaped (linebreaks + links only)
+    const time = document.createElement("span");
+    time.className = "bubble-time";
+    time.textContent = m.time;
+    div.append(time);
+    row.append(div);
+    if (!m.deleted) {
+      if (m.mine) {
+        const f = document.createElement("form");
+        f.method = "post";
+        f.setAttribute("action", `/messages/${id}/delete/${m.id}/`);
+        f.className = "bubble-action";
+        f.dataset.deleteMessage = "";
+        f.dataset.confirm = "Delete this message for both of you?";
+        f.innerHTML = '<button class="action" aria-label="Delete message">Delete</button>';
+        row.append(f);
+      } else {
+        const a = document.createElement("a");
+        a.className = "bubble-action action";
+        a.href = `/report/message/${m.id}/?next=${encodeURIComponent(location.pathname)}`;
+        a.setAttribute("aria-label", "Report message");
+        a.textContent = "Report";
+        row.append(a);
+      }
+    }
+    log.insertBefore(row, latest);
+    lastId = Math.max(lastId, m.id);
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch(`/messages/${id}/poll/?after=${lastId}&since_id=${firstId}`,
+        { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!r.ok) return;
+      const data = await r.json();
+      const stick = nearBottom();
+      data.messages.forEach(bubble);
+      data.deleted.forEach((mid) => {
+        const b = document.querySelector(`#m-${mid} .bubble`);
+        if (b && !b.classList.contains("bubble-deleted")) {
+          b.classList.add("bubble-deleted");
+          b.innerHTML = "<i>Message deleted</i>";
+          document.querySelector(`#m-${mid} .bubble-action`)?.remove();
+        }
+      });
+      if (data.messages.length && stick) toBottom();
+    } catch { /* offline */ }
+  }
+  onVisibleInterval(poll, 3000);
+
+  if (form && box) {
+    const grow = () => { box.style.height = "auto"; box.style.height = `${Math.min(box.scrollHeight, 160)}px`; };
+    box.addEventListener("input", grow);
+    box.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && matchMedia("(hover: hover)").matches) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const body = box.value.trim();
+      if (!body) return;
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      try {
+        const r = await fetch(form.getAttribute("action"), {
+          method: "POST", credentials: "same-origin",
+          headers: { Accept: "application/json", "X-CSRFToken": csrf() },
+          body: new URLSearchParams({ body }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.error?.message || "Message not sent. Try again.");
+        bubble(data.message);
+        box.value = "";
+        grow();
+        toBottom();
+      } catch (err) {
+        toast(err.message, "error");
+      } finally {
+        button.disabled = false;
+        box.focus();
+      }
+    });
+  }
+
+  log.addEventListener("submit", async (e) => {
+    const f = e.target.closest("[data-delete-message]");
+    if (!f) return;
+    e.preventDefault();
+    if (f.dataset.confirm && !confirm(f.dataset.confirm)) return;
+    const r = await fetch(f.getAttribute("action"), { method: "POST", credentials: "same-origin",
+      headers: { Accept: "application/json", "X-CSRFToken": csrf() } });
+    if (r.ok) {
+      const row = f.closest(".bubble-row");
+      const b = row.querySelector(".bubble");
+      b.classList.add("bubble-deleted");
+      b.innerHTML = "<i>Message deleted</i>";
+      f.remove();
+    }
+  }, true);
+})();
+
+// ---------- Repost without reloading ----------
+document.addEventListener("submit", async (e) => {
+  const form = e.target.closest("[data-repost]");
+  if (!form) return;
+  e.preventDefault();
+  const action = form.querySelector("input[name=action]");
+  try {
+    // getAttribute: form.action would return the <input name="action"> instead of the URL
+    const r = await fetch(form.getAttribute("action"), { method: "POST", credentials: "same-origin",
+      headers: { Accept: "application/json", "X-CSRFToken": form.querySelector("input[name=csrfmiddlewaretoken]").value },
+      body: new URLSearchParams({ action: action.value }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.error?.message || "Couldn't repost. Try again.");
+    document.querySelectorAll(`[data-repost-summary="${form.dataset.repost}"]`).forEach((s) => {
+      s.classList.toggle("is-on", data.reposted);
+      s.querySelector("[data-repost-count]").textContent = data.count;
+      s.closest("details").open = false;
+    });
+    document.querySelectorAll(`[data-repost="${form.dataset.repost}"]`).forEach((f) => {
+      f.querySelector("input[name=action]").value = data.reposted ? "undo" : "repost";
+      f.querySelector("button").textContent = data.reposted ? "Undo repost" : "Repost";
+    });
+    toast(data.reposted ? "Reposted." : "Repost removed.", "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+});

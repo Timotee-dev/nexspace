@@ -50,7 +50,11 @@ def feed_context(request):
     if next_params:
         query = "&".join(f"{k}={v}" for k, v in next_params.items())
         next_url = f"{reverse('core:home')}?tab={tab}&{query}"
-    return {"tab": tab, "posts": posts, "next_url": next_url, "is_first_page": page == 1 and before is None}
+    from django.db.models import Max
+
+    max_id = Post.objects.for_viewer(request.user).aggregate(m=Max("id"))["m"] or 0
+    return {"tab": tab, "posts": posts, "next_url": next_url, "is_first_page": page == 1 and before is None,
+            "max_post_id": max_id}
 
 
 # --- Compose ----------------------------------------------------------------
@@ -78,7 +82,8 @@ def compose_view(request):
                 messages.success(request, "Posted.")
                 return redirect(post.get_absolute_url())
     else:
-        initial_kind = request.GET.get("type") if request.GET.get("type") in Post.Kind.values else Post.Kind.POST
+        initial_kind = request.GET.get("type") if request.GET.get("type") in Post.Kind.values and \
+            request.GET.get("type") != Post.Kind.REPOST else Post.Kind.POST
         initial = {"kind": initial_kind}
         if request.GET.get("space"):
             initial["space"] = request.user.space_memberships.filter(space__slug=request.GET["space"]).values_list(
@@ -123,12 +128,16 @@ def build_thread(post, user):
 @login_required
 def detail_view(request, pk):
     post = get_visible_post(request.user, pk)
+    if post.kind == Post.Kind.REPOST and post.repost_of_id:
+        return redirect(post.repost_of.get_absolute_url())
+    post.is_reposted = post.pk in services.reposted_ids(request.user, [post])
     return render(request, "posts/detail.html", {
         "post": post,
         "thread": build_thread(post, request.user),
         "comment_form": CommentForm(),
         "is_asker": post.kind == Post.Kind.QUESTION and post.author_id == request.user.pk,
         "can_moderate": request.user.can_moderate(post.department),
+        "max_comment_id": post.comments.order_by("-id").values_list("id", flat=True).first() or 0,
     })
 
 
@@ -268,7 +277,7 @@ def topic_view(request, slug):
     topic = get_object_or_404(Topic, slug=slug, is_active=True)
     posts = list(
         feed.annotate_for_user(Post.objects.for_viewer(request.user).with_related(), request.user)
-        .filter(topics=topic)[:50]
+        .filter(topics=topic).exclude(kind=Post.Kind.REPOST)[:50]
     )
     return render(request, "posts/topic.html", {
         "topic": topic,
@@ -277,3 +286,154 @@ def topic_view(request, slug):
         "follower_count": topic.followers.count(),
     })
 
+
+
+
+# --- Editing -------------------------------------------------------------------------
+def _error_text(exc):
+    return " ".join(getattr(exc, "messages", [str(exc)]))
+
+
+@login_required
+def edit_post_view(request, pk):
+    post = get_visible_post(request.user, pk)
+    if post.author_id != request.user.pk:
+        raise PermissionDenied
+    topics = Topic.objects.filter(is_active=True)
+    error = None
+    if request.method == "POST":
+        try:
+            chosen = topics.filter(pk__in=request.POST.getlist("topics"))
+            services.edit_post(user=request.user, post=post, body=request.POST.get("body", ""),
+                               title=request.POST.get("title") if "title" in request.POST else None, topics=chosen)
+        except (ValidationError, PermissionDenied) as exc:
+            error = _error_text(exc)
+        except services.RateLimited as exc:
+            error = str(exc)
+        else:
+            messages.success(request, "Post updated.")
+            return redirect(post.get_absolute_url())
+    poll_locked = post.kind == Post.Kind.POLL and post.poll.votes.exists()
+    return render(request, "posts/edit.html", {
+        "post": post, "topics": topics, "chosen": set(post.topics.values_list("pk", flat=True)),
+        "error": error, "poll_locked": poll_locked,
+        "body": request.POST.get("body", post.body) if request.method == "POST" else post.body,
+    })
+
+
+@login_required
+def edit_comment_view(request, pk):
+    comment = get_object_or_404(Comment.objects.select_related("post"), pk=pk)
+    if not services.can_view(request.user, comment.post) or comment.author_id != request.user.pk:
+        raise Http404
+    error = None
+    if request.method == "POST":
+        try:
+            services.edit_comment(user=request.user, comment=comment, body=request.POST.get("body", ""))
+        except (ValidationError, PermissionDenied) as exc:
+            error = _error_text(exc)
+        except services.RateLimited as exc:
+            error = str(exc)
+        else:
+            messages.success(request, "Comment updated.")
+            return redirect(f"{comment.post.get_absolute_url()}#c-{comment.pk}")
+    return render(request, "posts/edit_comment.html", {"comment": comment, "error": error,
+                                                       "body": request.POST.get("body", comment.body)})
+
+
+@login_required
+def history_view(request, pk):
+    """Earlier versions of an edited post and its comments: for the author and moderators."""
+    post = get_visible_post(request.user, pk)
+    if post.author_id != request.user.pk and not request.user.can_moderate(post.department):
+        raise PermissionDenied
+    comments = (Comment.objects.filter(post=post, edited_at__isnull=False).select_related("author")
+                .prefetch_related("revisions"))
+    if post.author_id != request.user.pk and not request.user.can_moderate(post.department):
+        comments = comments.filter(author=request.user)
+    return render(request, "posts/history.html", {"post": post, "revisions": post.revisions.all(),
+                                                  "comments": comments})
+
+
+# --- Reposts -------------------------------------------------------------------------
+@login_required
+@require_POST
+def repost_view(request, pk):
+    post = get_visible_post(request.user, pk)
+    try:
+        if request.POST.get("action") == "undo":
+            services.undo_repost(user=request.user, post=post)
+            reposted = False
+        else:
+            services.repost(user=request.user, post=post)
+            reposted = True
+    except (ValidationError, PermissionDenied) as exc:
+        if request.headers.get("Accept") == "application/json":
+            from django.http import JsonResponse
+
+            return JsonResponse({"error": {"message": _error_text(exc)}}, status=400)
+        messages.error(request, _error_text(exc))
+        return _back(request, post.get_absolute_url())
+    except services.RateLimited as exc:
+        messages.error(request, str(exc))
+        return _back(request, post.get_absolute_url())
+    original = post.repost_of if post.kind == Post.Kind.REPOST and post.repost_of_id else post
+    original.refresh_from_db(fields=["repost_count"])
+    if request.headers.get("Accept") == "application/json":
+        from django.http import JsonResponse
+
+        return JsonResponse({"reposted": reposted, "count": original.repost_count})
+    messages.success(request, "Reposted." if reposted else "Repost removed.")
+    return _back(request, post.get_absolute_url())
+
+
+@login_required
+def quote_view(request, pk):
+    post = get_visible_post(request.user, pk)
+    if post.kind == Post.Kind.REPOST and post.repost_of_id:
+        post = get_visible_post(request.user, post.repost_of_id)
+    if not services.can_repost(request.user, post):
+        raise PermissionDenied
+    error = None
+    if request.method == "POST":
+        try:
+            new = services.repost(user=request.user, post=post, quote=request.POST.get("body", ""))
+        except (ValidationError, PermissionDenied) as exc:
+            error = _error_text(exc)
+        except services.RateLimited as exc:
+            error = str(exc)
+        else:
+            if not new.body:
+                error = "Write something, or use Repost instead."
+            else:
+                messages.success(request, "Quoted.")
+                return redirect(new.get_absolute_url())
+    return render(request, "posts/quote.html", {"original": post, "error": error,
+                                                "body": request.POST.get("body", "")})
+
+
+
+# --- Live updates (polled while the page is visible) -------------------------------------
+@login_required
+def live_feed_view(request):
+    from django.http import JsonResponse
+
+    try:
+        after = int(request.GET.get("after", "0"))
+    except ValueError:
+        after = 0
+    return JsonResponse({"new": feed.new_count(request.user, request.GET.get("tab", "for-you"), after)})
+
+
+@login_required
+def live_comments_view(request, pk):
+    from django.http import JsonResponse
+
+    post = get_visible_post(request.user, pk)
+    try:
+        after = int(request.GET.get("after", "0"))
+    except ValueError:
+        after = 0
+    new = (Comment.objects.filter(post=post, id__gt=after, is_deleted=False, is_hidden=False)
+           .exclude(author=request.user).count())
+    return JsonResponse({"new": new, "comment_count": post.comment_count})

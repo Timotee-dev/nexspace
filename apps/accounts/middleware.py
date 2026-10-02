@@ -3,7 +3,7 @@ from django.urls import reverse
 
 ALLOWED_PREFIXES = (
     "/onboarding/", "/logout/", "/verify-email/", "/password-reset/",
-    "/static/", "/media/", "/api/", "/django-admin/", "/privacy/", "/guidelines/", "/internal/",
+    "/static/", "/media/", "/api/", "/django-admin/", "/privacy/", "/guidelines/", "/internal/", "/email/",
 )
 
 

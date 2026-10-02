@@ -42,6 +42,7 @@ urlpatterns = [
     path("", include("apps.manage.urls")),
     path("", include("apps.manage.platform_urls")),
     path("", include("apps.nexai.urls")),
+    path("", include("apps.messaging.urls")),
     path("manifest.webmanifest", pwa.manifest_view, name="manifest"),
     path("sw.js", pwa.service_worker_view, name="service-worker"),
     path("offline/", pwa.offline_view, name="offline"),

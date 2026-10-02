@@ -47,6 +47,38 @@ def annotate_for_user(queryset, user):
     )
 
 
+def expand_reposts(items, user):
+    """Show plain reposts as the original post with a "<name> reposted" header (skipping originals the
+    viewer can't see or that already appear), and mark which posts the viewer has reposted."""
+    import copy
+
+    from .services import reposted_ids
+
+    plain = [p for p in items if p.kind == Post.Kind.REPOST]
+    originals = {}
+    if plain:
+        ids = {p.repost_of_id for p in plain if p.repost_of_id}
+        originals = {o.pk: o for o in annotate_for_user(
+            Post.objects.for_viewer(user).with_related().filter(pk__in=ids), user)}
+    out, seen = [], set()
+    for p in items:
+        if p.kind == Post.Kind.REPOST:
+            original = originals.get(p.repost_of_id)
+            if original is None or original.pk in seen:
+                continue
+            original = copy.copy(original)
+            original.reposted_by, original.repost_row_id = p.author, p.pk
+            out.append(original)
+            seen.add(original.pk)
+        elif p.pk not in seen:
+            out.append(p)
+            seen.add(p.pk)
+    mine = reposted_ids(user, out) if out else set()
+    for p in out:
+        p.is_reposted = p.pk in mine
+    return out
+
+
 def rank(post, *, now, followed_users, followed_topics, level, joined_spaces=frozenset()):
     hours = max((now - post.created_at).total_seconds() / 3600, 0)
     engagement = max(1 + W_SCORE * post.score + W_COMMENTS * post.comment_count, 0.2)
@@ -67,7 +99,7 @@ def rank(post, *, now, followed_users, followed_topics, level, joined_spaces=fro
 def for_you(user, page: int = 1):
     now = timezone.now()
     candidates = list(
-        annotate_for_user(base_queryset(user), user)
+        annotate_for_user(base_queryset(user).exclude(kind=Post.Kind.REPOST), user)  # originals rank on their own
         .filter(created_at__gte=now - FOR_YOU_WINDOW)
         .order_by("-created_at")[:FOR_YOU_CANDIDATES]
     )
@@ -94,7 +126,7 @@ def _chronological(queryset, before_id):
     return items, ({"before": items[-1].id} if has_more and items else None)
 
 
-def following(user, before_id=None):
+def _following_q(user):
     users, topics = followed_user_ids(user), followed_topic_ids(user)
     spaces = joined_space_ids(user, include_muted=False)
     matches = Q(pk__in=[])
@@ -104,7 +136,23 @@ def following(user, before_id=None):
         matches |= Q(author_id__in=users, is_anonymous=False)
     if topics:
         matches |= Q(topics__in=topics)
-    qs = annotate_for_user(base_queryset(user), user).filter(matches).distinct()
+    return matches
+
+
+def new_count(user, tab, after_id):
+    """How many posts appeared in this feed tab since `after_id` (for the "Show new posts" bar)."""
+    qs = base_queryset(user).filter(id__gt=after_id).exclude(author=user)
+    if tab == "following":
+        qs = qs.filter(_following_q(user)).distinct()
+    elif tab == "department":
+        qs = qs.filter(is_official=True)
+    else:
+        qs = qs.exclude(kind=Post.Kind.REPOST)
+    return qs.count()
+
+
+def following(user, before_id=None):
+    qs = annotate_for_user(base_queryset(user), user).filter(_following_q(user)).distinct()
     return _chronological(qs, before_id)
 
 
@@ -114,6 +162,11 @@ def department(user, before_id=None):
 
 
 def get_feed(user, tab, *, page=1, before=None):
+    items, cursor = _get_feed(user, tab, page=page, before=before)
+    return expand_reposts(items, user), cursor
+
+
+def _get_feed(user, tab, *, page=1, before=None):
     if tab == "following":
         return following(user, before)
     if tab == "department":

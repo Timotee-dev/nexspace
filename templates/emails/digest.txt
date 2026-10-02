@@ -1,0 +1,25 @@
+Hi {{ user.get_short_name }},
+
+Here's what's happening on NexSpace{% if weekly %} this week{% else %} today{% endif %}.
+{% if events %}
+COMING UP
+{% for e in events %}- {{ e.starts_at|date:"D j M, H:i" }}: {{ e.title }}{% if e.target_course %} ({{ e.target_course.code }}){% endif %}
+{% endfor %}{% endif %}{% if messages %}
+You have {{ messages }} unread conversation{{ messages|pluralize }}: {{ site_url }}/messages/
+{% endif %}{% if unread_count %}
+{{ unread_count }} new notification{{ unread_count|pluralize }}:
+{% for n in unread %}- {{ n.text }}
+{% endfor %}{% endif %}{% if announcements %}
+ANNOUNCEMENTS
+{% for a in announcements %}- {{ a.title }}
+{% endfor %}{% endif %}{% if materials %}
+NEW IN YOUR COURSES
+{% for r in materials %}- {{ r.course.code }}: {{ r.title }}
+{% endfor %}{% endif %}{% if top_posts %}
+POPULAR IN YOUR DEPARTMENT
+{% for p in top_posts %}- {% if p.title %}{{ p.title }}{% else %}{{ p.body|truncatechars:90 }}{% endif %}
+{% endfor %}{% endif %}
+Open NexSpace: {{ site_url }}
+
+Change how often you get this: {{ settings_url }}
+Stop these emails: {{ unsubscribe }}

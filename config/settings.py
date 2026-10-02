@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "apps.groups",
     "apps.manage",
     "apps.nexai",
+    "apps.messaging",
 ]
 
 MIDDLEWARE = [
@@ -192,7 +193,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.8.0",
+    "VERSION": "0.9.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -254,3 +255,8 @@ STAFF_VERIFICATION = os.environ.get("STAFF_VERIFICATION", "platform").strip().lo
 
 # Stay signed in for 30 days.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
+
+# --- Email digests ---------------------------------------------------------------
+# Brevo's free plan sends 300 emails a day; digests stop at this cap and continue on the next run.
+DIGEST_DAILY_CAP = int(os.environ.get("DIGEST_DAILY_CAP", "250"))
+DIGEST_HOUR = int(os.environ.get("DIGEST_HOUR", "7"))  # local time digests start going out

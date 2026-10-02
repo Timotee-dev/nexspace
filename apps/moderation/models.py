@@ -8,6 +8,7 @@ class TargetType(models.TextChoices):
     RESOURCE = "resource", "Resource"
     USER = "user", "User"
     SPACE = "space", "Space"
+    MESSAGE = "message", "Direct message"
 
 
 class Report(models.Model):

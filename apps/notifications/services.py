@@ -92,6 +92,36 @@ def post_created(post):
 
 
 @safely
+def message_received(message, recipient):
+    """One notification per conversation every 10 minutes, so a burst of messages isn't a burst of pings."""
+    sender = message.sender
+    bucket = timezone.now().strftime("%Y%m%d%H") + str(timezone.now().minute // 10)
+    notify([recipient], category=Category.MESSAGES, kind=Notification.Kind.MESSAGE,
+           text=f"{sender.full_name} sent you a message", url=message.conversation.get_absolute_url(), actor=sender,
+           dedupe_key=f"dm:{message.conversation_id}:{recipient.pk}:{bucket}")
+
+
+@safely
+def mentioned_in_edit(post, users):
+    from apps.posts.services import can_view
+
+    who = _name(post.author, post.is_anonymous)
+    notify([u for u in users if can_view(u, post)], category=Category.SOCIAL, kind=Notification.Kind.MENTION,
+           text=f"{who} mentioned you in a post", url=post.get_absolute_url(),
+           actor=None if post.is_anonymous else post.author)
+
+
+@safely
+def reposted(new_post):
+    original = new_post.repost_of
+    verb = "quoted" if new_post.kind != "repost" else "reposted"
+    notify([original.author], category=Category.SOCIAL, kind=Notification.Kind.REPOST,
+           text=f"{new_post.author.full_name} {verb} your post", url=new_post.get_absolute_url()
+           if new_post.kind != "repost" else original.get_absolute_url(), actor=new_post.author,
+           dedupe_key=f"repost:{original.pk}:{new_post.author_id}:{verb}")
+
+
+@safely
 def comment_created(comment):
     post = comment.post
     url = f"{post.get_absolute_url()}#c-{comment.pk}"

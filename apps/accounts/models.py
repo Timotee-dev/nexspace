@@ -209,6 +209,14 @@ class Profile(models.Model):
     show_matric_number = models.BooleanField(default=False)
     show_social_links = models.BooleanField(default=True)
     show_joined_spaces = models.BooleanField(default=True)
+
+    class MessagePermission(models.TextChoices):
+        EVERYONE = "everyone", "Anyone in my department"
+        FOLLOWING = "following", "Only people I follow"
+        NOBODY = "nobody", "Nobody"
+
+    allow_messages_from = models.CharField(max_length=10, choices=MessagePermission.choices,
+                                           default=MessagePermission.EVERYONE)
     theme = models.CharField(max_length=8, choices=Theme.choices, default=Theme.SYSTEM)
 
     updated_at = models.DateTimeField(auto_now=True)

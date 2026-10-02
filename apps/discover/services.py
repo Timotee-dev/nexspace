@@ -20,7 +20,7 @@ def compute_trending(department_id, limit=10):
                  .values_list("post_id").annotate(n=Count("id")))
     comments = dict(Comment.objects.filter(post__department_id=department_id, created_at__gte=since, is_deleted=False)
                     .values_list("post_id").annotate(n=Count("id")))
-    fresh = set(Post.objects.visible().filter(department_id=department_id, created_at__gte=since)
+    fresh = set(Post.objects.visible().exclude(kind="repost").filter(department_id=department_id, created_at__gte=since)
                 .values_list("id", flat=True))
     scores = {}
     for pid in set(votes) | set(comments) | fresh:

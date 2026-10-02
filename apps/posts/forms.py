@@ -9,7 +9,8 @@ DATETIME_WIDGET = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="
 
 
 class ComposerForm(forms.Form):
-    kind = forms.ChoiceField(choices=Post.Kind.choices, initial=Post.Kind.POST, widget=forms.RadioSelect)
+    kind = forms.ChoiceField(choices=[c for c in Post.Kind.choices if c[0] != Post.Kind.REPOST],
+                             initial=Post.Kind.POST, widget=forms.RadioSelect)
     title = forms.CharField(max_length=150, required=False)
     body = forms.CharField(max_length=BODY_MAX, required=False, widget=forms.Textarea(attrs={"rows": 5}))
     topics = forms.ModelMultipleChoiceField(

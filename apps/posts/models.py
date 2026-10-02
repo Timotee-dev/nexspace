@@ -28,8 +28,9 @@ class PostQuerySet(models.QuerySet):
 
     def with_related(self):
         return self.select_related(
-            "author__profile", "author__staff_profile", "poll", "event", "opportunity", "department", "space__course"
-        ).prefetch_related("topics", "attachments", "poll__options")
+            "author__profile", "author__staff_profile", "poll", "event", "opportunity", "department", "space__course",
+            "repost_of__author__profile", "repost_of__space",
+        ).prefetch_related("topics", "attachments", "poll__options", "repost_of__attachments")
 
 
 class Post(models.Model):
@@ -39,6 +40,7 @@ class Post(models.Model):
         POLL = "poll", "Poll"
         EVENT = "event", "Event"
         OPPORTUNITY = "opportunity", "Opportunity"
+        REPOST = "repost", "Repost"
 
     ANONYMOUS_KINDS = {Kind.POST, Kind.QUESTION}
 
@@ -67,6 +69,10 @@ class Post(models.Model):
     removed_by_moderator = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    edited_at = models.DateTimeField(null=True, blank=True, help_text="Set when the author edits the post")
+    # Reposts: a plain repost has kind=REPOST and no body; a quote is a normal post with repost_of set.
+    repost_of = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="reposts")
+    repost_count = models.PositiveIntegerField(default=0)
 
     objects = PostQuerySet.as_manager()
 
@@ -205,6 +211,7 @@ class Comment(models.Model):
         help_text="Set when a reply is flattened into a depth-3 thread",
     )
     body = models.TextField(max_length=COMMENT_MAX)
+    edited_at = models.DateTimeField(null=True, blank=True)
     mentions = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="mentioned_in_comments")
     score = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
@@ -248,3 +255,24 @@ class Bookmark(models.Model):
     class Meta:
         ordering = ["-created_at"]
         constraints = [models.UniqueConstraint(fields=["user", "post"], name="unique_bookmark")]
+
+
+class PostRevision(models.Model):
+    """The previous version of a post, saved every time its author edits it (visible to moderators)."""
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="revisions")
+    title = models.CharField(max_length=150, blank=True)
+    body = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class CommentRevision(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="revisions")
+    body = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

@@ -3,10 +3,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from . import services
-from .models import Category, Notification
+from .models import NotificationPreference, Category, Notification
 
 PAGE = 30
 
@@ -51,6 +52,7 @@ PREF_FIELDS = [
     (Category.ACADEMIC, "New course materials, past questions and exam or deadline reminders"),
     (Category.DEPARTMENT, "Announcements from your department and course reps"),
     (Category.OPPORTUNITIES, "New opportunities and reminders you set"),
+    (Category.MESSAGES, "New direct messages"),
 ]
 
 
@@ -61,6 +63,8 @@ def preferences_view(request):
         for category, _ in PREF_FIELDS:
             for channel in ("in_app", "push"):
                 setattr(prefs, f"{category}_{channel}", f"{category}_{channel}" in request.POST)
+        if request.POST.get("digest") in NotificationPreference.Digest.values:
+            prefs.digest = request.POST["digest"]
         prefs.save()
         messages.success(request, "Notification settings saved.")
         return redirect("notifications:preferences")
@@ -70,6 +74,23 @@ def preferences_view(request):
         "rows": rows, "section": "notifications", "push_enabled": settings.PUSH_ENABLED,
         "vapid_public_key": settings.VAPID_PUBLIC_KEY,
         "device_count": request.user.push_subscriptions.count(),
+        "digest": prefs.digest, "digest_choices": NotificationPreference.Digest.choices,
     })
+
+
+@csrf_exempt
+def digest_unsubscribe_view(request, token):
+    """One click from the email turns digests off — no login needed (the link is signed)."""
+    from .digest import user_from_token
+
+    user = user_from_token(token)
+    if user is None:
+        return render(request, "notifications/unsubscribed.html", {"ok": False}, status=400)
+    if request.method != "POST":  # email link scanners open links; only a real click (POST) unsubscribes
+        return render(request, "notifications/unsubscribed.html", {"ok": True, "confirm": True, "token": token})
+    prefs, _ = NotificationPreference.objects.get_or_create(user=user)
+    prefs.digest = NotificationPreference.Digest.OFF
+    prefs.save(update_fields=["digest"])
+    return render(request, "notifications/unsubscribed.html", {"ok": True, "confirm": False})
 
 

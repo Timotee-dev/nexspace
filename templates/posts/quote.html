@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}Quote post{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ original.get_absolute_url }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back</a></div>
+<div class="page-head"><h1>Quote post</h1><p>Add your thoughts. The original post appears below yours.</p></div>
+<form method="post" class="form panel stack">
+  {% csrf_token %}
+  {% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+  <div class="field"><label for="q-body">Your comment</label><textarea id="q-body" name="body" rows="4" maxlength="2000" required data-count="q-count" placeholder="What do you think?">{{ body }}</textarea><p class="field-help" id="q-count"></p></div>
+  {% include "posts/_embed.html" with original=original %}
+  <div class="form-actions"><a class="btn btn-quiet" href="{{ original.get_absolute_url }}">Cancel</a><button type="submit" class="btn btn-primary">Post</button></div>
+</form>
+{% endblock %}

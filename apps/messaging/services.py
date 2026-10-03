@@ -13,7 +13,10 @@ from django.utils import timezone
 from apps.accounts.models import RoleAssignment
 from apps.posts.services import _limit, require_verified
 
-from .models import MESSAGE_MAX, Block, Conversation, ConversationMember, Message
+from .models import (
+    GROUP_MAX_MEMBERS, MAX_MESSAGE_ATTACHMENTS, MESSAGE_MAX, Block, Conversation, ConversationMember, Message,
+    MessageAttachment,
+)
 
 SEND_RATE = (30, 60)  # 30 messages a minute
 NEW_CONVERSATION_RATE = (20, 60 * 60)  # 20 new conversations an hour
@@ -52,6 +55,9 @@ def _key(a, b):
 
 
 def other_member(conversation, user):
+    """The other person in a one-to-one chat (None for groups)."""
+    if conversation.is_group:
+        return None
     return next((m.user for m in conversation.members.select_related("user__profile") if m.user_id != user.pk), None)
 
 
@@ -83,33 +89,171 @@ def membership(user, conversation):
     return member
 
 
+def _save_attachments(message, files):
+    from apps.core.uploads import image_content_type, optimize_image, validate_document_upload
+
+    for upload in files:
+        content_type = getattr(upload, "content_type", "") or ""
+        if content_type.startswith("image/"):
+            content_type = image_content_type(upload)  # validates it really is an image
+            upload = optimize_image(upload)            # resizes and strips location data
+            kind = MessageAttachment.Kind.IMAGE
+        else:
+            content_type = validate_document_upload(upload)  # type and size checks
+            kind = MessageAttachment.Kind.FILE
+        MessageAttachment.objects.create(message=message, kind=kind, file=upload, original_name=upload.name[:150],
+                                         size=upload.size, content_type=content_type)
+
+
 @transaction.atomic
-def send_message(*, sender, conversation, body):
+def send_message(*, sender, conversation, body, files=()):
+    """Send text and/or up to 4 photos or files. One-to-one chats re-check permission on every message
+    (a block or privacy change applies immediately); in groups, membership is what counts."""
     require_verified(sender)
     membership(sender, conversation)
-    recipient = other_member(conversation, sender)
-    if recipient is None:
-        raise ValidationError("This conversation has ended.")
-    allowed, reason = can_message(sender, recipient)
-    if not allowed:
-        raise PermissionDenied(reason)
+    files = list(files or [])
+    if conversation.is_group:
+        recipients = [m.user for m in conversation.members.select_related("user").exclude(user=sender)]
+    else:
+        recipient = other_member(conversation, sender)
+        if recipient is None:
+            raise ValidationError("This conversation has ended.")
+        allowed, reason = can_message(sender, recipient)
+        if not allowed:
+            raise PermissionDenied(reason)
+        recipients = [recipient]
     body = (body or "").strip()
-    if not body:
-        raise ValidationError("Write a message first.")
+    if not body and not files:
+        raise ValidationError("Write a message or attach something first.")
     if len(body) > MESSAGE_MAX:
         raise ValidationError(f"Messages can be up to {MESSAGE_MAX} characters.")
+    if len(files) > MAX_MESSAGE_ATTACHMENTS:
+        raise ValidationError(f"Attach up to {MAX_MESSAGE_ATTACHMENTS} photos or files at a time.")
     _limit(sender, "dm", SEND_RATE)
     message = Message.objects.create(conversation=conversation, sender=sender, body=body)
+    if files:
+        _save_attachments(message, files)
     now = message.created_at
     Conversation.objects.filter(pk=conversation.pk).update(last_message_at=now)
     ConversationMember.objects.filter(conversation=conversation).update(hidden_at=None)
     ConversationMember.objects.filter(conversation=conversation, user=sender).update(last_read_at=now)
     from apps.notifications import services as notifications
 
-    recipient_member = ConversationMember.objects.get(conversation=conversation, user=recipient)
-    if not recipient_member.is_muted:
-        notifications.message_received(message, recipient)
+    muted = set(ConversationMember.objects.filter(conversation=conversation, is_muted=True)
+                .values_list("user_id", flat=True))
+    for recipient in recipients:
+        if recipient.pk not in muted:
+            notifications.message_received(message, recipient)
     return message
+
+
+# --- Group chats ------------------------------------------------------------------------
+def _system(conversation, actor, text):
+    message = Message.objects.create(conversation=conversation, sender=actor, body=text, is_system=True)
+    Conversation.objects.filter(pk=conversation.pk).update(last_message_at=message.created_at)
+    return message
+
+
+def _check_addable(actor, people):
+    """Everyone added must be someone the actor is allowed to message (department, privacy, blocks)."""
+    for person in people:
+        allowed, reason = can_message(actor, person)
+        if not allowed:
+            raise PermissionDenied(f"You can't add {person.full_name}: {reason[0].lower() + reason[1:]}")
+
+
+@transaction.atomic
+def create_group(*, creator, title, members):
+    require_verified(creator)
+    title = " ".join((title or "").split())[:80]
+    if not title:
+        raise ValidationError("Give the group a name.")
+    people = {m.pk: m for m in members if m.pk != creator.pk}
+    if not people:
+        raise ValidationError("Add at least one person.")
+    if len(people) + 1 > GROUP_MAX_MEMBERS:
+        raise ValidationError(f"Groups can have up to {GROUP_MAX_MEMBERS} people.")
+    _check_addable(creator, people.values())
+    _limit(creator, "dm-new", NEW_CONVERSATION_RATE)
+    group = Conversation.objects.create(is_group=True, title=title, created_by=creator,
+                                        department_id=creator.department_id)
+    ConversationMember.objects.create(conversation=group, user=creator, is_admin=True)
+    ConversationMember.objects.bulk_create([ConversationMember(conversation=group, user=p) for p in people.values()])
+    _system(group, creator, f"{creator.full_name} created the group")
+    from apps.notifications import services as notifications
+
+    for person in people.values():
+        notifications.added_to_group(group, creator, person)
+    return group
+
+
+def _require_group_admin(user, group):
+    if not group.is_group:
+        raise ValidationError("This isn't a group.")
+    if not membership(user, group).is_admin:
+        raise PermissionDenied("Only group admins can do that.")
+
+
+@transaction.atomic
+def add_members(*, actor, group, people):
+    _require_group_admin(actor, group)
+    existing = set(group.members.values_list("user_id", flat=True))
+    new = [p for p in {p.pk: p for p in people}.values() if p.pk not in existing]
+    if not new:
+        return []
+    if len(existing) + len(new) > GROUP_MAX_MEMBERS:
+        raise ValidationError(f"Groups can have up to {GROUP_MAX_MEMBERS} people.")
+    _check_addable(actor, new)
+    ConversationMember.objects.bulk_create([ConversationMember(conversation=group, user=p) for p in new])
+    names = ", ".join(p.full_name for p in new)
+    _system(group, actor, f"{actor.full_name} added {names}")
+    from apps.notifications import services as notifications
+
+    for person in new:
+        notifications.added_to_group(group, actor, person)
+    return new
+
+
+@transaction.atomic
+def remove_member(*, actor, group, person):
+    _require_group_admin(actor, group)
+    if person.pk == actor.pk:
+        raise ValidationError("Use Leave group to leave it yourself.")
+    if ConversationMember.objects.filter(conversation=group, user=person).delete()[0]:
+        _system(group, actor, f"{actor.full_name} removed {person.full_name}")
+
+
+@transaction.atomic
+def leave_group(*, user, group):
+    member = membership(user, group)
+    if not group.is_group:
+        raise ValidationError("You can only leave group chats.")
+    was_admin = member.is_admin
+    member.delete()
+    remaining = ConversationMember.objects.filter(conversation=group).order_by("joined_at", "id")
+    if was_admin and remaining.exists() and not remaining.filter(is_admin=True).exists():
+        heir = remaining.first()  # the longest-standing member takes over
+        heir.is_admin = True
+        heir.save(update_fields=["is_admin"])
+    if remaining.exists():
+        _system(group, user, f"{user.full_name} left")
+
+
+@transaction.atomic
+def rename_group(*, actor, group, title):
+    _require_group_admin(actor, group)
+    title = " ".join((title or "").split())[:80]
+    if not title:
+        raise ValidationError("Give the group a name.")
+    if title != group.title:
+        group.title = title
+        group.save(update_fields=["title"])
+        _system(group, actor, f'{actor.full_name} renamed the group to "{title}"')
+
+
+def make_admin(*, actor, group, person):
+    _require_group_admin(actor, group)
+    ConversationMember.objects.filter(conversation=group, user=person).update(is_admin=True)
 
 
 def mark_read(user, conversation):
@@ -145,12 +289,14 @@ def inbox(user, limit=50):
         unread = conv.messages.filter(is_deleted=False).exclude(sender=user).filter(
             created_at__gt=m.last_read_at) .exists() if m.last_read_at else \
             conv.messages.filter(is_deleted=False).exclude(sender=user).exists()
-        rows.append({"conversation": conv, "other": other, "last": last, "unread": unread, "muted": m.is_muted})
+        rows.append({"conversation": conv, "other": other, "last": last, "unread": unread, "muted": m.is_muted,
+                     "is_group": conv.is_group, "member_count": conv.members.count() if conv.is_group else 2})
     return rows
 
 
 def messages_after(conversation, after_id=0, limit=200):
-    return list(conversation.messages.filter(id__gt=after_id).select_related("sender").order_by("id")[:limit])
+    return list(conversation.messages.filter(id__gt=after_id).select_related("sender")
+                .prefetch_related("attachments").order_by("id")[:limit])
 
 
 @transaction.atomic
@@ -160,6 +306,9 @@ def delete_message(*, user, message):
     message.is_deleted = True
     message.body = ""
     message.save(update_fields=["is_deleted", "body"])
+    for attachment in message.attachments.all():
+        attachment.file.delete(save=False)
+    message.attachments.all().delete()
 
 
 def hide_conversation(user, conversation):

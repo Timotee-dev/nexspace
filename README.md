@@ -124,6 +124,12 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Group chats, photos and files in messages (v0.10)
+
+- **Group chats:** Messages → **New group**. Name it and pick people from your department (searchable list), up to 50. The creator is the group admin; admins rename the group, add and remove people, and make others admins. Anyone can leave; if the last admin leaves, the longest-standing member becomes admin. Changes show as small lines in the chat ("Ada added Bayo"). You can only add people you're allowed to message (same department, their "who can message me" setting, and blocks all apply).
+- **Photos and files in messages** (one-to-one and groups): the paperclip attaches up to 4 at a time — photos (resized, location data removed) and PDF, Word or PowerPoint files (same size limit as other uploads). They appear live in the chat. Only people in the conversation can open them; deleting a message deletes its files too.
+- Group messages notify everyone in the group (bundled, and not if they've muted it). Reporting works the same as for one-to-one messages: only people in the conversation can report a message.
+
 ## Lecturer sign-up fix (v0.9.2)
 
 - Lecturers can sign up even when their department has no courses on NexSpace yet (the course list is optional, and says so when it's empty). The course list follows the department picked.
@@ -184,7 +190,7 @@ A full review of the app found and fixed: a privacy leak (profile Replies showed
 
 ## Deliberately not built yet
 
-Sharing between departments (faculty-wide Spaces, cross-department search); semantic (embedding) search for NexAI — keyword ranking is used so there's no extra service to run; OCR for scanned PDFs; true WebSocket push (live updates use short polling instead); group chats and images in direct messages. Navigation only shows pages that exist, so there are no dead buttons. Use the admin dashboard at `/manage/` for courses, sessions, Spaces, roles and accounts. The Django admin at `/django-admin/` remains for emergencies.
+Sharing between departments (faculty-wide Spaces, cross-department search); semantic (embedding) search for NexAI — keyword ranking is used so there's no extra service to run; OCR for scanned PDFs; true WebSocket push (live updates use short polling instead). Navigation only shows pages that exist, so there are no dead buttons. Use the admin dashboard at `/manage/` for courses, sessions, Spaces, roles and accounts. The Django admin at `/django-admin/` remains for emergencies.
 
 ## Deploying to Render
 

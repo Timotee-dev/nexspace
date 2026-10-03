@@ -2,15 +2,16 @@
 {% load nexspace %}
 {% block title %}Messages{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Messages</h1><p>Private conversations with people in your department. To start one, open someone's profile and tap <b>Message</b>.</p></div>
+<div class="page-head topic-head"><div><h1>Messages</h1><p>Private chats and groups with people in your department. To message one person, open their profile and tap <b>Message</b>.</p></div>
+  <a class="btn btn-primary" href="{% url 'messaging:new-group' %}">New group</a></div>
 {% if rows %}
 <ul class="inbox">
   {% for row in rows %}{% with other=row.other conv=row.conversation last=row.last %}
   <li><a class="inbox-row{% if row.unread %} is-unread{% endif %}" href="{{ conv.get_absolute_url }}">
-    {% if other %}{% include "partials/avatar.html" with person=other %}{% endif %}
+    {% if row.is_group %}<span class="avatar group-avatar" aria-hidden="true">{{ conv.title|first|upper }}</span>{% elif other %}{% include "partials/avatar.html" with person=other %}{% endif %}
     <span class="inbox-text">
-      <span class="inbox-top"><b>{% if other %}{{ other.display_name }}{% else %}Deleted user{% endif %}</b>{% if row.muted %} <span class="muted small" aria-label="muted">🔕</span>{% endif %}<span class="muted small">{{ conv.last_message_at|ago }}</span></span>
-      <span class="inbox-preview">{% if last.sender_id == user.pk %}You: {% endif %}{% if last.is_deleted or last.is_hidden %}<i>Message deleted</i>{% else %}{{ last.body|truncatechars:90 }}{% endif %}</span>
+      <span class="inbox-top"><b>{% if row.is_group %}{{ conv.title }} <span class="muted small">· {{ row.member_count }}</span>{% elif other %}{{ other.display_name }}{% else %}Deleted user{% endif %}</b>{% if row.muted %} <span class="muted small" aria-label="muted">🔕</span>{% endif %}<span class="muted small">{{ conv.last_message_at|ago }}</span></span>
+      <span class="inbox-preview">{% if last.is_system %}{{ last.body|truncatechars:90 }}{% else %}{% if last.sender_id == user.pk %}You: {% elif row.is_group %}{{ last.sender.get_short_name }}: {% endif %}{% if last.is_deleted or last.is_hidden %}<i>Message deleted</i>{% elif last.body %}{{ last.body|truncatechars:90 }}{% else %}📎 Attachment{% endif %}{% endif %}</span>
     </span>
     {% if row.unread %}<span class="unread-dot" aria-label="Unread"></span>{% endif %}
   </a></li>

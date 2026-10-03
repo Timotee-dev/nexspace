@@ -1,0 +1,11 @@
+<fieldset class="field people-picker" data-people-picker>
+  <legend>People</legend>
+  <label for="people-filter" class="visually-hidden">Search people</label>
+  <input id="people-filter" type="search" placeholder="Search by name or @username" data-people-filter>
+  {% if people %}
+  <ul class="people-list">
+    {% for p in people %}<li data-person="{{ p.full_name|lower }} {{ p.username }}"><label class="choice"><input type="checkbox" name="members" value="{{ p.pk }}"{% if chosen and p.pk|stringformat:"s" in chosen %} checked{% endif %}><span class="choice-text"><b>{{ p.display_name }}</b> <span class="muted small">@{{ p.username }}{% if p.level %} · {{ p.level }}L{% endif %}</span></span></label></li>{% endfor %}
+  </ul>
+  <p class="small muted" data-people-none hidden>No one matches.</p>
+  {% else %}<p class="small muted">There's no one you can add. People who turned off messages, or whom you've blocked, can't be added.</p>{% endif %}
+</fieldset>

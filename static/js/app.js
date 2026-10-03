@@ -345,41 +345,75 @@ if (document.body.dataset.authenticated === "true") {
   const toBottom = () => latest.scrollIntoView({ block: "end" });
   toBottom();
 
+  const isGroup = page.dataset.group === "true";
+
+  function attachmentNodes(m) {
+    return (m.attachments || []).map((a) => {
+      const link = document.createElement("a");
+      link.href = a.url;
+      if (a.kind === "image") {
+        link.className = "bubble-image";
+        link.target = "_blank";
+        link.rel = "noopener";
+        const img = document.createElement("img");
+        img.src = a.url;
+        img.alt = `Photo: ${a.name}`;
+        img.loading = "lazy";
+        link.append(img);
+      } else {
+        link.className = "bubble-file";
+        const ext = document.createElement("span");
+        ext.className = "file-ext";
+        ext.textContent = a.ext;
+        const name = document.createElement("span");
+        name.className = "file-name";
+        name.textContent = a.name;
+        link.append(ext, name);
+      }
+      return link;
+    });
+  }
+
   function bubble(m) {
     if (document.getElementById(`m-${m.id}`)) return;
     log.querySelector(".chat-empty")?.remove();
     const row = document.createElement("li");
-    row.className = `bubble-row${m.mine ? " mine" : ""}`;
     row.id = `m-${m.id}`;
     row.dataset.id = m.id;
+    if (m.system) {
+      row.className = "chat-system";
+      row.textContent = m.html.replace(/<[^>]+>/g, "");  // plain text only
+      log.insertBefore(row, latest);
+      lastId = Math.max(lastId, m.id);
+      return;
+    }
+    row.className = `bubble-row${m.mine ? " mine" : ""}`;
     const div = document.createElement("div");
     div.className = `bubble${m.deleted ? " bubble-deleted" : ""}`;
-    if (m.deleted) div.innerHTML = "<i>Message deleted</i>";
-    else div.innerHTML = m.html;  // server-escaped (linebreaks + links only)
+    if (isGroup && !m.mine) {
+      const who = document.createElement("span");
+      who.className = "bubble-sender";
+      who.textContent = m.sender;
+      div.append(who);
+    }
+    if (m.deleted) {
+      const i = document.createElement("i");
+      i.textContent = "Message deleted";
+      div.append(i);
+    } else {
+      div.append(...attachmentNodes(m));
+      if (m.html) {
+        const text = document.createElement("span");
+        text.className = "bubble-text";
+        text.innerHTML = m.html;  // server-escaped (linebreaks + links only)
+        div.append(text);
+      }
+    }
     const time = document.createElement("span");
     time.className = "bubble-time";
     time.textContent = m.time;
     div.append(time);
     row.append(div);
-    if (!m.deleted) {
-      if (m.mine) {
-        const f = document.createElement("form");
-        f.method = "post";
-        f.setAttribute("action", `/messages/${id}/delete/${m.id}/`);
-        f.className = "bubble-action";
-        f.dataset.deleteMessage = "";
-        f.dataset.confirm = "Delete this message for both of you?";
-        f.innerHTML = '<button class="action" aria-label="Delete message">Delete</button>';
-        row.append(f);
-      } else {
-        const a = document.createElement("a");
-        a.className = "bubble-action action";
-        a.href = `/report/message/${m.id}/?next=${encodeURIComponent(location.pathname)}`;
-        a.setAttribute("aria-label", "Report message");
-        a.textContent = "Report";
-        row.append(a);
-      }
-    }
     log.insertBefore(row, latest);
     lastId = Math.max(lastId, m.id);
   }
@@ -414,22 +448,57 @@ if (document.body.dataset.authenticated === "true") {
         form.requestSubmit();
       }
     });
+    const picker = form.querySelector("[data-chat-attach]");
+    const chips = form.querySelector("[data-chat-files]");
+    let pending = [];
+    const maxDoc = Number(document.body.dataset.maxDocMb || 10) * 1024 * 1024;
+    const renderChips = () => {
+      chips.replaceChildren(...pending.map((f, i) => {
+        const chip = document.createElement("span");
+        chip.className = "chat-file-chip";
+        const name = document.createElement("span");
+        name.textContent = `${f.type.startsWith("image/") ? "🖼" : "📄"} ${f.name}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Remove ${f.name}`);
+        remove.addEventListener("click", () => { pending.splice(i, 1); renderChips(); });
+        chip.append(name, remove);
+        return chip;
+      }));
+      chips.hidden = pending.length === 0;
+    };
+    picker?.addEventListener("change", () => {
+      for (const f of picker.files) {
+        const limit = f.type.startsWith("image/") ? 5 * 1024 * 1024 : maxDoc;
+        if (f.size > limit) { toast(`${f.name} is too big (max ${Math.round(limit / 1048576)} MB).`, "error"); continue; }
+        if (pending.length >= 4) { toast("Attach up to 4 photos or files at a time.", "error"); break; }
+        pending.push(f);
+      }
+      picker.value = "";
+      renderChips();
+    });
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const body = box.value.trim();
-      if (!body) return;
+      if (!body && !pending.length) return;
       const button = form.querySelector("button[type=submit]");
       button.disabled = true;
+      const data = new FormData();
+      data.append("body", body);
+      pending.forEach((f) => data.append("files", f));
       try {
-        const r = await fetch(form.getAttribute("action"), {
+        const r = await fetch(form.action, {
           method: "POST", credentials: "same-origin",
-          headers: { Accept: "application/json", "X-CSRFToken": csrf() },
-          body: new URLSearchParams({ body }),
+          headers: { Accept: "application/json", "X-CSRFToken": csrf() }, body: data,
         });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error?.message || "Message not sent. Try again.");
-        bubble(data.message);
+        const json = await r.json();
+        if (!r.ok) throw new Error(json?.error?.message || "Message not sent. Try again.");
+        bubble(json.message);
         box.value = "";
+        pending = [];
+        renderChips();
         grow();
         toBottom();
       } catch (err) {
@@ -502,3 +571,19 @@ document.addEventListener("submit", async (e) => {
   deptSelect.addEventListener("change", sync);
   sync();
 })();
+
+
+// ---------- People picker (new group / add people) ----------
+document.querySelectorAll("[data-people-picker]").forEach((picker) => {
+  const input = picker.querySelector("[data-people-filter]");
+  const none = picker.querySelector("[data-people-none]");
+  input?.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase().replace(/^@/, "");
+    let shown = 0;
+    picker.querySelectorAll("[data-person]").forEach((li) => {
+      li.hidden = q !== "" && !li.dataset.person.includes(q);
+      if (!li.hidden) shown += 1;
+    });
+    if (none) none.hidden = shown > 0;
+  });
+});

@@ -2,15 +2,20 @@
 {% load nexspace %}
 {% block title %}{% if other %}{{ other.display_name }}{% else %}Conversation{% endif %} · Messages{% endblock %}
 {% block content %}
-<div class="chat-page" data-chat="{{ conversation.pk }}" data-last-id="{{ last_id }}" data-first-id="{% if items %}{{ items.0.pk }}{% else %}0{% endif %}">
+<div class="chat-page" data-chat="{{ conversation.pk }}" data-group="{% if conversation.is_group %}true{% else %}false{% endif %}" data-last-id="{{ last_id }}" data-first-id="{% if items %}{{ items.0.pk }}{% else %}0{% endif %}">
   <header class="chat-head">
     <a class="icon-btn" href="{% url 'messaging:inbox' %}" aria-label="Back to messages"><svg class="icon"><use href="#i-back"/></svg></a>
+    {% if conversation.is_group %}<a class="chat-person" href="{% url 'messaging:group' conversation.pk %}"><span class="avatar avatar-sm group-avatar" aria-hidden="true">{{ conversation.title|first|upper }}</span><span><b>{{ conversation.title }}</b><span class="muted small">{{ member_count }} people · tap for details</span></span></a>{% endif %}
     {% if other %}<a class="chat-person" href="{% url 'accounts:profile' other.username %}">{% include "partials/avatar.html" with person=other size_class="avatar-sm" %}<span><b>{{ other.display_name }}</b>{% if other.staff_badge %} <span class="tag tag-staff">{{ other.staff_badge }}</span>{% endif %}<span class="muted small">@{{ other.username }}</span></span></a>{% endif %}
     <details class="menu">
       <summary class="icon-btn" aria-label="Conversation options"><svg class="icon"><use href="#i-more"/></svg></summary>
       <div class="menu-panel">
         <form method="post" action="{% url 'messaging:action' conversation.pk %}">{% csrf_token %}<button name="action" value="mute" class="menu-item">{% if muted %}Unmute{% else %}Mute notifications{% endif %}</button></form>
         <form method="post" action="{% url 'messaging:action' conversation.pk %}">{% csrf_token %}<button name="action" value="hide" class="menu-item">Remove from inbox</button></form>
+        {% if conversation.is_group %}
+        <a class="menu-item" href="{% url 'messaging:group' conversation.pk %}">Group details</a>
+        <form method="post" action="{% url 'messaging:action' conversation.pk %}" data-confirm="Leave this group?">{% csrf_token %}<button name="action" value="leave" class="menu-item danger">Leave group</button></form>
+        {% endif %}
         {% if other %}
         <form method="post" action="{% url 'messaging:action' conversation.pk %}"{% if not blocked %} data-confirm="Block {{ other.full_name }}? Neither of you will be able to message the other."{% endif %}>{% csrf_token %}<button name="action" value="{% if blocked %}unblock{% else %}block{% endif %}" class="menu-item danger">{% if blocked %}Unblock{% else %}Block{% endif %} {{ other.full_name }}</button></form>
         <a class="menu-item" href="{% url 'moderation:report' 'user' other.pk %}?next={{ request.get_full_path|urlencode }}">Report {{ other.full_name }}</a>
@@ -22,30 +27,43 @@
   <ol class="chat-log" aria-live="polite" aria-label="Messages">
     {% for m in items %}
     {% ifchanged m.created_at.date %}<li class="chat-day"><span>{{ m.created_at|date:"D j M" }}</span></li>{% endifchanged %}
+    {% if m.is_system %}
+    <li class="chat-system" id="m-{{ m.pk }}" data-id="{{ m.pk }}">{{ m.body }}</li>
+    {% else %}
     <li class="bubble-row{% if m.sender_id == user.pk %} mine{% endif %}" id="m-{{ m.pk }}" data-id="{{ m.pk }}">
       <div class="bubble{% if m.is_deleted or m.is_hidden %} bubble-deleted{% endif %}">
-        {% if m.is_deleted or m.is_hidden %}<i>Message deleted</i>{% else %}{{ m.body|urlize|linebreaksbr }}{% endif %}
+        {% if conversation.is_group and m.sender_id != user.pk %}<span class="bubble-sender">{{ m.sender.full_name }}</span>{% endif %}
+        {% if m.is_deleted or m.is_hidden %}<i>Message deleted</i>{% else %}
+          {% for a in m.attachments.all %}{% if a.kind == "image" %}<a class="bubble-image" href="{% url 'messaging:attachment' conversation.pk a.pk %}" target="_blank" rel="noopener"><img src="{% url 'messaging:attachment' conversation.pk a.pk %}" alt="Photo: {{ a.original_name }}" loading="lazy"></a>{% else %}<a class="bubble-file" href="{% url 'messaging:attachment' conversation.pk a.pk %}"><span class="file-ext">{{ a.extension }}</span><span class="file-name">{{ a.original_name }}</span></a>{% endif %}{% endfor %}
+          {% if m.body %}<span class="bubble-text">{{ m.body|urlize|linebreaksbr }}</span>{% endif %}
+        {% endif %}
         <span class="bubble-time">{{ m.created_at|time:"H:i" }}</span>
       </div>
       {% if not m.is_deleted and not m.is_hidden %}
       {% if m.sender_id == user.pk %}
-      <form method="post" action="{% url 'messaging:delete' conversation.pk m.pk %}" class="bubble-action" data-delete-message data-confirm="Delete this message for both of you?">{% csrf_token %}<button class="action" aria-label="Delete message">Delete</button></form>
+      <form method="post" action="{% url 'messaging:delete' conversation.pk m.pk %}" class="bubble-action" data-delete-message data-confirm="Delete this message for everyone?">{% csrf_token %}<button class="action" aria-label="Delete message">Delete</button></form>
       {% else %}
       <a class="bubble-action action" href="{% url 'moderation:report' 'message' m.pk %}?next={{ request.get_full_path|urlencode }}" aria-label="Report message">Report</a>
       {% endif %}
       {% endif %}
     </li>
+    {% endif %}
     {% empty %}
-    <li class="chat-empty muted">Say hello{% if other %} to {{ other.full_name }}{% endif %}. Messages are private between you two; moderators only see a message if it's reported.</li>
+    <li class="chat-empty muted">Say hello{% if other %} to {{ other.full_name }}{% endif %}. Messages are private to {% if conversation.is_group %}the people in this group{% else %}you two{% endif %}; moderators only see a message if it's reported.</li>
     {% endfor %}
     <li id="latest" aria-hidden="true"></li>
   </ol>
 
   {% if can_send %}
-  <form method="post" action="{% url 'messaging:send' conversation.pk %}" class="chat-compose" data-chat-form>
+  <form method="post" action="{% url 'messaging:send' conversation.pk %}" class="chat-compose" data-chat-form enctype="multipart/form-data">
     {% csrf_token %}
+    <div class="chat-files" data-chat-files hidden></div>
+    <label class="icon-btn chat-attach" title="Attach photos or files (up to 4)">
+      <svg class="icon" aria-hidden="true"><use href="#i-paperclip"/></svg><span class="visually-hidden">Attach photos or files</span>
+      <input type="file" name="files" multiple accept="image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.ppt,.pptx" data-chat-attach hidden>
+    </label>
     <label for="chat-body" class="visually-hidden">Message</label>
-    <textarea id="chat-body" name="body" rows="1" maxlength="2000" required placeholder="Write a message…" data-no-swipe></textarea>
+    <textarea id="chat-body" name="body" rows="1" maxlength="2000" placeholder="Write a message…" data-no-swipe></textarea>
     <button type="submit" class="btn btn-primary" aria-label="Send">Send</button>
   </form>
   {% else %}

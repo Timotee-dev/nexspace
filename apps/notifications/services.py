@@ -92,12 +92,21 @@ def post_created(post):
 
 
 @safely
+def added_to_group(group, actor, person):
+    notify([person], category=Category.MESSAGES, kind=Notification.Kind.MESSAGE,
+           text=f'{actor.full_name} added you to "{group.title}"', url=group.get_absolute_url(), actor=actor,
+           dedupe_key=f"group-added:{group.pk}:{person.pk}")
+
+
+@safely
 def message_received(message, recipient):
     """One notification per conversation every 10 minutes, so a burst of messages isn't a burst of pings."""
     sender = message.sender
     bucket = timezone.now().strftime("%Y%m%d%H") + str(timezone.now().minute // 10)
     notify([recipient], category=Category.MESSAGES, kind=Notification.Kind.MESSAGE,
-           text=f"{sender.full_name} sent you a message", url=message.conversation.get_absolute_url(), actor=sender,
+           text=(f'{sender.full_name} in "{message.conversation.title}"' if message.conversation.is_group
+                 else f"{sender.full_name} sent you a message"),
+           url=message.conversation.get_absolute_url(), actor=sender,
            dedupe_key=f"dm:{message.conversation_id}:{recipient.pk}:{bucket}")
 
 

@@ -124,6 +124,11 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Admin pages are the owner's alone (v0.10.2)
+
+- The **Admin** link appears only for the platform owner. Anyone else who opens `/manage/` or `/platform/` (including HODs) gets an **"Admin only"** sign-in screen that accepts only the owner's account; signing in there switches that browser to the owner account. Wrong accounts are refused, and repeated attempts are rate-limited like normal login. Set `ADMIN_AREA=department` on Render if you ever want HODs to use the department admin pages again.
+- Chat: pressing Enter or Send several times quickly now sends the message once (the box clears immediately and the text comes back if sending fails).
+
 ## Owner-only admin (v0.10.1)
 
 - **Only `arifalotimothy@gmail.com` can ever be a platform admin** (set by `PLATFORM_OWNER_EMAILS`). Any other account with superuser, staff or Super Admin rights — made with `createsuperuser`, in the database admin, or in an older version — loses them automatically after every deploy (`migrate`) and the moment it logs in. Nothing happens if no owner email is set, so a site can't lock itself out.

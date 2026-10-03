@@ -479,15 +479,23 @@ if (document.body.dataset.authenticated === "true") {
       renderChips();
     });
 
+    let sending = false;  // one message at a time, however many times Enter or Send is pressed
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (sending) return;
       const body = box.value.trim();
       if (!body && !pending.length) return;
+      sending = true;
       const button = form.querySelector("button[type=submit]");
       button.disabled = true;
       const data = new FormData();
       data.append("body", body);
-      pending.forEach((f) => data.append("files", f));
+      const files = pending;
+      files.forEach((f) => data.append("files", f));
+      box.value = "";  // clear straight away so the same text can't be sent twice
+      pending = [];
+      renderChips();
+      grow();
       try {
         const r = await fetch(form.action, {
           method: "POST", credentials: "same-origin",
@@ -496,14 +504,13 @@ if (document.body.dataset.authenticated === "true") {
         const json = await r.json();
         if (!r.ok) throw new Error(json?.error?.message || "Message not sent. Try again.");
         bubble(json.message);
-        box.value = "";
-        pending = [];
-        renderChips();
-        grow();
         toBottom();
       } catch (err) {
+        if (!box.value) { box.value = body; grow(); }  // put the text back so nothing is lost
+        if (!pending.length) { pending = files; renderChips(); }
         toast(err.message, "error");
       } finally {
+        sending = false;
         button.disabled = false;
         box.focus();
       }

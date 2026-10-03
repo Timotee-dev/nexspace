@@ -70,7 +70,7 @@ def test_account_without_department_is_asked_for_one(client, department):
 
 def test_forbidden_page_is_styled(client, make_user):
     client.force_login(make_user(email="s@example.com"))
-    r = client.get(reverse("manage:overview"))
+    r = client.get(reverse("moderation:queue"))  # admin pages now redirect to the admin sign-in instead
     assert r.status_code == 403 and "You don't have access to this page" in r.content.decode()
 
 

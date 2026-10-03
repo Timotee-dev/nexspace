@@ -1,0 +1,17 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Admin sign-in{% endblock %}
+{% block card %}
+<header>
+  <h1>Admin only</h1>
+  <p>This page is only for the NexSpace admin. {% if user.is_authenticated %}You're signed in as <b>{{ user.email }}</b>, which doesn't have access. {% endif %}Sign in with the admin account to continue.</p>
+</header>
+{% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="field"><label for="admin-email">Admin email</label><input id="admin-email" type="email" name="email" autocomplete="username" required></div>
+  <div class="field"><label for="admin-password">Password</label><div class="password-wrap"><input id="admin-password" type="password" name="password" autocomplete="current-password" required><button type="button" class="icon-btn" data-reveal aria-label="Show password" aria-pressed="false"><svg class="icon-sm"><use href="#i-eye"/></svg></button></div></div>
+  <button type="submit" class="btn btn-primary btn-block">Sign in as admin</button>
+</form>
+<p class="auth-switch"><a href="/">Back to NexSpace</a></p>
+{% endblock %}

@@ -1,3 +1,6 @@
+from django.conf import settings
+
+
 def nexspace(request):
     user = getattr(request, "user", None)
     theme = "system"
@@ -10,13 +13,14 @@ def nexspace(request):
             theme = user.profile.theme
         if user.department_id:
             is_moderator = user.can_moderate(user.department)
-            is_dept_admin = user.has_role("department_admin", department=user.department)
+            # The Admin link is for the platform owner only (unless ADMIN_AREA=department).
+            is_dept_admin = user.is_platform_admin if settings.ADMIN_AREA == "owner" else \
+                user.has_role("department_admin", department=user.department)
         from apps.messaging.services import unread_count as unread_messages
         from apps.notifications.services import unread_count
 
         unread = unread_count(user)
         dms = unread_messages(user)
-    from django.conf import settings
 
     has_dashboard = bool(user is not None and user.is_authenticated and user.has_dashboard)
     return {"max_document_mb": settings.MAX_DOCUMENT_MB, "has_dashboard": has_dashboard, "nexai_enabled": settings.NEXAI_ENABLED, "theme_preference": theme, "is_moderator": is_moderator, "is_dept_admin": is_dept_admin,

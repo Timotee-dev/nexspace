@@ -209,7 +209,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.10.1",
+    "VERSION": "0.10.2",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -278,3 +278,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
 # Brevo's free plan sends 300 emails a day; digests stop at this cap and continue on the next run.
 DIGEST_DAILY_CAP = int(os.environ.get("DIGEST_DAILY_CAP", "250"))
 DIGEST_HOUR = int(os.environ.get("DIGEST_HOUR", "7"))  # local time digests start going out
+
+# Who can open the admin pages (/manage/ and /platform/): "owner" (default) — only the platform owner;
+# everyone else is asked to sign in with the owner account. "department" lets HODs/department admins in.
+ADMIN_AREA = os.environ.get("ADMIN_AREA", "owner").strip().lower()

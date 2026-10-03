@@ -23,7 +23,7 @@
 
 {% if "admin" in sections %}
 <section class="dash-section" aria-labelledby="dash-admin">
-  <div class="panel-head"><h2 id="dash-admin" class="section-title">Department</h2><a href="{% url 'manage:overview' %}">Full analytics</a></div>
+  <div class="panel-head"><h2 id="dash-admin" class="section-title">Department</h2>{% if is_dept_admin %}<a href="{% url 'manage:overview' %}">Full analytics</a>{% endif %}</div>
   <dl class="kpi-grid">
     <div class="kpi"><dt>Members</dt><dd>{{ admin.totals.users }}</dd><dd class="kpi-note">{{ admin.totals.new_users }} new this month</dd></div>
     <div class="kpi"><dt>Active this week</dt><dd>{{ admin.totals.active_7 }}</dd><dd class="kpi-note">{{ admin.totals.verified_pct }}% verified email</dd></div>
@@ -32,7 +32,7 @@
   </dl>
   <div class="dash-grid">
     <div class="panel">
-      <div class="panel-head"><h3 class="section-title">{% if admin.can_verify %}Staff to verify{% else %}Staff awaiting verification{% endif %}</h3><a href="{% url 'manage:staff' %}">All staff</a></div>
+      <div class="panel-head"><h3 class="section-title">{% if admin.can_verify %}Staff to verify{% else %}Staff awaiting verification{% endif %}</h3>{% if is_dept_admin %}<a href="{% url 'manage:staff' %}">All staff</a>{% endif %}</div>
       {% if admin.pending_staff %}
       <ul class="member-list">{% for s in admin.pending_staff %}<li class="request-row"><span><b>{{ s.user.full_name }}</b><span class="small muted"> · {{ s.get_position_display }}{% if s.requested_courses.all %} · {% for c in s.requested_courses.all %}{{ c.code }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if s.requested_level %} · {{ s.requested_level }} Level{% endif %}</span></span>
         {% if admin.can_verify %}<form method="post" action="{% url 'manage:staff-decision' s.pk %}" class="request-actions">{% csrf_token %}<button name="decision" value="approve" class="btn btn-primary btn-sm">Verify</button><button name="decision" value="reject" class="btn btn-ghost btn-sm">Reject</button></form>{% else %}<span class="small muted">Awaiting platform admin</span>{% endif %}</li>{% endfor %}</ul>
@@ -43,13 +43,13 @@
       {% if admin.no_lecturer %}<p class="link-list">{% for c in admin.no_lecturer %}<a class="chip-static" href="{{ c.get_absolute_url }}">{{ c.code }}</a>{% endfor %}</p>{% else %}<p class="muted small">Every course has a lecturer.</p>{% endif %}
       <h3 class="section-title" style="margin-top:16px">Courses with no course rep</h3>
       {% if admin.no_rep %}<p class="link-list">{% for c in admin.no_rep %}<a class="chip-static" href="{{ c.get_absolute_url }}">{{ c.code }}</a>{% endfor %}</p>{% else %}<p class="muted small">Every course has a rep.</p>{% endif %}
-      <p class="small muted" style="margin-top:12px">Assign lecturers and reps from <a href="{% url 'manage:users' %}">People</a>.</p>
+      {% if is_dept_admin %}<p class="small muted" style="margin-top:12px">Assign lecturers and reps from <a href="{% url 'manage:users' %}">People</a>.</p>{% endif %}
     </div>
   </div>
   <div class="quick-actions">
     <a class="btn btn-primary btn-sm" href="{% url 'notices:announcement-create' %}?audience=department">Announce to the department</a>
-    <a class="btn btn-ghost btn-sm" href="{% url 'manage:course-create' %}">Add a course</a>
-    <a class="btn btn-ghost btn-sm" href="{% url 'manage:staff' %}">Staff</a>
+    {% if is_dept_admin %}<a class="btn btn-ghost btn-sm" href="{% url 'manage:course-create' %}">Add a course</a>
+    <a class="btn btn-ghost btn-sm" href="{% url 'manage:staff' %}">Staff</a>{% endif %}
   </div>
 </section>
 {% endif %}

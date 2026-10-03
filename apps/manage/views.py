@@ -12,6 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
@@ -29,11 +30,19 @@ from . import analytics
 
 
 # --- Access ----------------------------------------------------------------------
+def _admin_sign_in(request):
+    from urllib.parse import urlencode
+
+    return redirect(f"{reverse('manage:sign-in')}?{urlencode({'next': request.get_full_path()})}")
+
+
 def admin_required(view):
     @wraps(view)
     @login_required
     def wrapper(request, *args, **kwargs):
         user = request.user
+        if settings.ADMIN_AREA == "owner" and not user.is_platform_admin:
+            return _admin_sign_in(request)  # only the platform owner may use the admin pages
         department = user.department
         if user.is_platform_admin and request.GET.get("dept"):
             department = get_object_or_404(Department, pk=request.GET["dept"])
@@ -442,3 +451,33 @@ def staff_decision_view(request, pk):
     except PermissionDenied as exc:
         messages.error(request, str(exc) or "You can't verify this account.")
     return redirect("manage:staff")
+
+
+
+def admin_sign_in_view(request):
+    """The admin pages only accept the platform owner. Anyone else is asked to sign in as the owner;
+    signing in here switches this browser to the owner account."""
+    from django.contrib.auth import authenticate, login, logout
+
+    from apps.core import ratelimit
+
+    next_url = request.GET.get("next") or request.POST.get("next") or reverse("manage:overview")
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = reverse("manage:overview")
+    if request.user.is_authenticated and request.user.is_platform_admin:
+        return redirect(next_url)
+    error = None
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip().lower()
+        if ratelimit.is_locked(request, email):
+            error = "Too many attempts. Wait a few minutes and try again."
+        else:
+            user = authenticate(request, email=email, password=request.POST.get("password", ""))
+            if user is not None and user.is_platform_admin:
+                ratelimit.clear_failures(request, email)
+                logout(request)
+                login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                return redirect(next_url)
+            ratelimit.record_failure(request, email)
+            error = "Only the NexSpace admin account can open this page."
+    return render(request, "manage/sign_in.html", {"error": error, "next": next_url}, status=403 if error else 200)

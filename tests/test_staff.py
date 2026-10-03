@@ -17,6 +17,13 @@ from apps.spaces.models import Space
 from .conftest import PASSWORD
 
 pytestmark = pytest.mark.django_db
+
+@pytest.fixture(autouse=True)
+def _department_admin_area(settings):
+    """These tests cover department admins using /manage/ (ADMIN_AREA=department).
+    The default owner-only admin area is tested in test_admin_sign_in.py."""
+    settings.ADMIN_AREA = "department"
+
 R = RoleAssignment.Role
 
 

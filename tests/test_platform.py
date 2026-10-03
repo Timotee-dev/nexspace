@@ -69,7 +69,8 @@ def test_platform_pages_are_platform_admin_only(client, owner, hod, make_user):
     for user in (make_user(email="s@example.com"), hod):
         client.force_login(user)
         for name in pages:
-            assert client.get(reverse(f"platform:{name}")).status_code == 403, name
+            r = client.get(reverse(f"platform:{name}"))
+            assert r.status_code == 302 and r.url.startswith(reverse("manage:sign-in")), name
     client.force_login(owner)
     for name in pages:
         assert client.get(reverse(f"platform:{name}")).status_code == 200, name
@@ -87,7 +88,8 @@ def test_only_platform_admins_verify_staff(run_hooks, owner, hod, department):
     assert staff.is_verified_staff
 
 
-def test_platform_verify_page_and_hod_read_only(client, owner, hod, department):
+def test_platform_verify_page_and_hod_read_only(client, owner, hod, department, settings):
+    settings.ADMIN_AREA = "department"  # the HOD's read-only staff list is only reachable in department mode
     staff = register_staff(email="l@example.com", password=PASSWORD, full_name="Waiting Person", department=department,
                            position="exam_officer")
     User.objects.filter(pk=hod.pk).update(onboarding_completed=True)

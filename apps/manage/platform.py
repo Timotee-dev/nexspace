@@ -71,7 +71,9 @@ def platform_required(view):
     @login_required
     def wrapper(request, *args, **kwargs):
         if not request.user.is_platform_admin:
-            raise PermissionDenied
+            from .views import _admin_sign_in
+
+            return _admin_sign_in(request)
         return view(request, *args, **kwargs)
     return wrapper
 

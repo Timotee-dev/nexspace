@@ -99,7 +99,14 @@ def test_verification_grants_position_powers(run_hooks, department, courses, hod
 
     new_hod = register_staff(email="h2@example.com", password=PASSWORD, full_name="New Head", department=department,
                              position="hod", title="prof")
-    verify_staff(admin=hod, staff=new_hod.staff_profile, approve=True)
+    with pytest.raises(PermissionDenied):
+        verify_staff(admin=hod, staff=new_hod.staff_profile, approve=True)  # only the platform owner verifies HODs
+    owner = User.objects.create_user(email="arifalotimothy@gmail.com", password=PASSWORD, full_name="Owner",
+                                      department=department, email_verified=True)
+    from apps.accounts.owner import ensure_owner
+
+    ensure_owner(owner)
+    verify_staff(admin=owner, staff=new_hod.staff_profile, approve=True)
     assert new_hod.can_moderate(department) and new_hod.has_role(R.DEPARTMENT_ADMIN, department=department)
 
 

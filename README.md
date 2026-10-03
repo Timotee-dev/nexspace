@@ -124,6 +124,12 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Owner-only admin (v0.10.1)
+
+- **Only `arifalotimothy@gmail.com` can ever be a platform admin** (set by `PLATFORM_OWNER_EMAILS`). Any other account with superuser, staff or Super Admin rights — made with `createsuperuser`, in the database admin, or in an older version — loses them automatically after every deploy (`migrate`) and the moment it logs in. Nothing happens if no owner email is set, so a site can't lock itself out.
+- **Only the platform owner can make someone a Department Admin**, verify a HOD, or remove a department admin. HODs and department admins can still give out course rep, lecturer, level adviser, exam officer and moderator roles in their own department.
+- On laptops (`DEBUG=True`) the demo account `admin@nexspace.test` is also allowed, so `seed_demo` keeps working. Never on the live site.
+
 ## Group chats, photos and files in messages (v0.10)
 
 - **Group chats:** Messages → **New group**. Name it and pick people from your department (searchable list), up to 50. The creator is the group admin; admins rename the group, add and remove people, and make others admins. Anyone can leave; if the last admin leaves, the longest-standing member becomes admin. Changes show as small lines in the chat ("Ada added Bayo"). You can only add people you're allowed to message (same department, their "who can message me" setting, and blocks all apply).

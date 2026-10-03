@@ -262,6 +262,8 @@ def can_verify_staff(admin, staff) -> bool:
         return False
     if admin.is_platform_admin:
         return True
+    if staff.position == "hod":
+        return False  # a HOD becomes a department admin, so only the platform owner verifies HODs
     if settings.STAFF_VERIFICATION == "platform":
         return False
     return admin.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN, department=staff.user.department)

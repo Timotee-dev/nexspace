@@ -13,6 +13,7 @@ def create_profile(sender, instance, created, **kwargs):
 
 @receiver(user_logged_in)
 def keep_owner_admin(sender, request, user, **kwargs):
-    from .owner import ensure_owner
+    from .owner import demote_if_not_owner, ensure_owner
 
     ensure_owner(user)
+    demote_if_not_owner(user)

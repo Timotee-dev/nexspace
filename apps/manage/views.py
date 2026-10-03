@@ -117,9 +117,12 @@ class RoleForm(forms.Form):
     level = forms.TypedChoiceField(choices=[("", "Choose a level"), *Level.choices], coerce=int, required=False,
                                    empty_value=None, help_text="For level advisers")
 
-    def __init__(self, *args, department, **kwargs):
+    def __init__(self, *args, department, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["course"].queryset = Course.objects.filter(department=department, is_active=True)
+        if user is None or not user.is_platform_admin:  # only the platform owner makes department admins
+            self.fields["role"].choices = [c for c in self.fields["role"].choices
+                                           if c[0] != RoleAssignment.Role.DEPARTMENT_ADMIN]
 
     def clean(self):
         data = super().clean()
@@ -134,7 +137,7 @@ class RoleForm(forms.Form):
 def user_detail_view(request, pk):
     dept = request.manage_department
     member = get_object_or_404(User.objects.select_related("profile"), pk=pk, department=dept)
-    form = RoleForm(department=dept)
+    form = RoleForm(department=dept, user=request.user)
     return _render(request, "manage/user_detail.html", {
         "member": member, "role_form": form,
         "roles": member.role_assignments.select_related("course", "department"),
@@ -158,10 +161,12 @@ def user_action_view(request, pk):
         return redirect("manage:user", pk=member.pk)
     try:
         if action == "assign_role":
-            form = RoleForm(request.POST, department=dept)
+            form = RoleForm(request.POST, department=dept, user=request.user)
             if not form.is_valid():
                 raise ValidationError(" ".join(e for errs in form.errors.values() for e in errs))
             role, course, level = form.cleaned_data["role"], form.cleaned_data.get("course"), form.cleaned_data.get("level")
+            if role == RoleAssignment.Role.DEPARTMENT_ADMIN and not request.user.is_platform_admin:
+                raise PermissionDenied("Only the platform admin can make someone a department admin.")
             if role in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LECTURER):
                 assign_role(user=member, role=role, course=course, granted_by=request.user)
             elif role == RoleAssignment.Role.LEVEL_ADVISER:
@@ -171,8 +176,9 @@ def user_action_view(request, pk):
             messages.success(request, "Role assigned.")
         elif action == "revoke_role":
             ra = get_object_or_404(RoleAssignment, pk=request.POST.get("assignment"), user=member)
-            if ra.role == RoleAssignment.Role.SUPER_ADMIN and not request.user.is_platform_admin:
-                raise PermissionDenied("Only super admins can change super admins.")
+            if ra.role in (RoleAssignment.Role.SUPER_ADMIN, RoleAssignment.Role.DEPARTMENT_ADMIN) \
+                    and not request.user.is_platform_admin:
+                raise PermissionDenied("Only the platform admin can change department admins.")
             revoke_role(user=member, role=ra.role, department=ra.department, course=ra.course, level=ra.level,
                         revoked_by=request.user)
             messages.success(request, "Role removed.")

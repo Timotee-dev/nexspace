@@ -209,7 +209,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.10.0",
+    "VERSION": "0.10.1",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -266,6 +266,8 @@ CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
 # These accounts are always platform (super) admins once their email is verified. They can't be
 # demoted, suspended, banned or deleted from inside NexSpace. Override with a comma-separated list.
 PLATFORM_OWNER_EMAILS = [e.lower() for e in env_list("PLATFORM_OWNER_EMAILS", "arifalotimothy@gmail.com")]
+if DEBUG:  # the seed_demo platform admin, on your laptop only (seed_demo refuses to run in production)
+    PLATFORM_OWNER_EMAILS.append("admin@nexspace.test")
 # Who verifies staff sign-ups: "platform" (platform admins only) or "department" (HOD/department admins).
 STAFF_VERIFICATION = os.environ.get("STAFF_VERIFICATION", "platform").strip().lower()
 

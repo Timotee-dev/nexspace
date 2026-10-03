@@ -30,3 +30,44 @@ def ensure_all_owners(**kwargs):
 
     for user in User.objects.filter(email__in=settings.PLATFORM_OWNER_EMAILS):
         ensure_owner(user)
+    strip_non_owner_admins()
+
+
+def strip_non_owner_admins(**kwargs):
+    """Only the owner accounts may be platform admins. Anyone else holding superuser/staff flags or the
+    Super Admin role (e.g. made with `createsuperuser`, or in the database admin) loses them.
+
+    Runs after every `migrate` (so on every Render deploy) and whenever a non-owner logs in.
+    Does nothing if no owner email is configured, so a deployment can never lock itself out.
+    """
+    from django.conf import settings
+    from django.db.models import Q
+
+    from .models import RoleAssignment, User
+    from .services import audit
+
+    owners = settings.PLATFORM_OWNER_EMAILS
+    if not owners:
+        return 0
+    offenders = (User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)
+                                     | Q(role_assignments__role=RoleAssignment.Role.SUPER_ADMIN))
+                 .exclude(email__in=owners).distinct())
+    count = 0
+    for user in offenders:
+        User.objects.filter(pk=user.pk).update(is_superuser=False, is_staff=False)
+        RoleAssignment.objects.filter(user=user, role=RoleAssignment.Role.SUPER_ADMIN).delete()
+        audit(None, "admin.revoked_non_owner", user, email=user.email)
+        count += 1
+    return count
+
+
+def demote_if_not_owner(user):
+    from django.conf import settings
+
+    from .models import RoleAssignment
+
+    if not settings.PLATFORM_OWNER_EMAILS or is_owner_email(user.email):
+        return
+    if user.is_superuser or user.is_staff or user.role_assignments.filter(role=RoleAssignment.Role.SUPER_ADMIN).exists():
+        strip_non_owner_admins()
+        user.is_superuser = user.is_staff = False

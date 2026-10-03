@@ -367,7 +367,7 @@ def test_admin_cannot_touch_other_departments(client, admin, make_user, other_de
 
 
 def test_super_admin_switches_department(client, make_user, other_department, department):
-    boss = make_user(email="boss@example.com")
+    boss = make_user(email="arifalotimothy@gmail.com")  # only the owner can be a platform admin
     assign_role(user=boss, role=RoleAssignment.Role.SUPER_ADMIN)
     client.force_login(boss)
     page = client.get(reverse("manage:overview") + f"?dept={other_department.pk}").content.decode()

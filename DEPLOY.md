@@ -97,10 +97,9 @@ This sends exam and deadline reminders, the weekly summary emails, delivers push
 
 ```bash
 python manage.py bootstrap_institution --university "University of Medical Sciences, Ondo" --short UNIMED --faculty "Faculty of Computing" --department "Computer Science" --code CSC
-python manage.py createsuperuser
 ```
 
-Easier: just sign up on the live site with `arifalotimothy@gmail.com` and click the verification email. That account becomes the platform admin automatically, so you don't need `createsuperuser` at all.
+Don't use `createsuperuser` on the live site: any admin account that isn't the owner's email is stripped of its rights automatically. Instead, just sign up on the live site with `arifalotimothy@gmail.com` and click the verification email. That account becomes the platform admin automatically, so you don't need `createsuperuser` at all.
 
 Then log in, and in `/manage/`:
 

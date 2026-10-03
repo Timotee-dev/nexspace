@@ -58,7 +58,7 @@ def test_department_admin_can_open_any_announcement(client, rep, course, make_us
 
 
 def test_account_without_department_is_asked_for_one(client, department):
-    boss = User.objects.create_superuser(email="boss@example.com", password=PASSWORD, full_name="Boss")
+    boss = User.objects.create_superuser(email="arifalotimothy@gmail.com", password=PASSWORD, full_name="Boss")
     client.force_login(boss)
     r = client.get(reverse("manage:overview"))
     assert r.status_code == 302 and "step=department" in r.url

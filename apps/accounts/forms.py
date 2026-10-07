@@ -207,9 +207,9 @@ class ProfileForm(forms.Form):
             profile.avatar.delete(save=False)
             profile.avatar = ""
         elif data.get("avatar"):
-            from apps.core.uploads import optimize_image
+            from apps.core.uploads import prepare_image
 
-            profile.avatar = optimize_image(data["avatar"])
+            profile.avatar, _ = prepare_image(data["avatar"])
         for field in ("bio", "skills", "github_url", "linkedin_url", "portfolio_url"):
             setattr(profile, field, data[field])
         profile.save()

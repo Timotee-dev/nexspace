@@ -137,15 +137,14 @@ def create_post(
     post.topics.set(topics)
     post.mentions.set(extract_mentions(f"{title} {body}", exclude=author))
 
-    from apps.core.uploads import image_content_type, optimize_image, validate_document_upload
+    from apps.core.uploads import prepare_document, prepare_image
 
     for i, image in enumerate(images):
-        content_type = image_content_type(image)
-        image = optimize_image(image)
+        image, content_type = prepare_image(image)  # resized, metadata stripped, fits storage
         Attachment.objects.create(post=post, kind=Attachment.Kind.IMAGE, file=image, position=i,
                                   original_name=image.name[:150], size=image.size, content_type=content_type)
     for i, upload in enumerate(files):
-        content_type = validate_document_upload(upload)
+        upload, content_type = prepare_document(upload)  # checked, compressed if big, fits storage
         Attachment.objects.create(post=post, kind=Attachment.Kind.FILE, file=upload, position=i,
                                   original_name=upload.name[:150], size=upload.size, content_type=content_type)
 

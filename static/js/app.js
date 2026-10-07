@@ -141,8 +141,9 @@ document.querySelectorAll("[data-avatar-input]").forEach((input) => {
     const file = input.files?.[0];
     const preview = document.querySelector("[data-avatar-preview]");
     if (!file || !preview) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast("Images must be 5 MB or smaller.", "error");
+    const maxMb = Number(document.body.dataset.maxDocMb || 100);
+    if (file.size > maxMb * 1024 * 1024) {
+      toast(`Images must be ${maxMb} MB or smaller.`, "error");
       input.value = "";
       return;
     }
@@ -470,7 +471,7 @@ if (document.body.dataset.authenticated === "true") {
     };
     picker?.addEventListener("change", () => {
       for (const f of picker.files) {
-        const limit = f.type.startsWith("image/") ? 5 * 1024 * 1024 : maxDoc;
+        const limit = maxDoc;  // big files are compressed on the server
         if (f.size > limit) { toast(`${f.name} is too big (max ${Math.round(limit / 1048576)} MB).`, "error"); continue; }
         if (pending.length >= 4) { toast("Attach up to 4 photos or files at a time.", "error"); break; }
         pending.push(f);

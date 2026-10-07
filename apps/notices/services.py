@@ -82,9 +82,9 @@ def publish_announcement(*, user, title, body, priority=Announcement.Priority.NO
         raise ValidationError("The expiry date must be in the future.")
     extra = {}
     if attachment is not None:
-        from apps.core.uploads import validate_document_upload
+        from apps.core.uploads import prepare_document
 
-        validate_document_upload(attachment)
+        attachment, _ = prepare_document(attachment)
         extra = {"attachment": attachment, "attachment_name": attachment.name[:150]}
     announcement = Announcement.objects.create(
         title=title.strip()[:150], body=body.strip()[:3000], priority=priority, expires_at=expires_at, **target, **extra

@@ -165,9 +165,16 @@ STORAGES = {
 }
 
 # Upload limits (Section 39 of the spec). Cloudinary's free plan rejects files over 10 MB.
-MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
-MAX_DOCUMENT_MB = int(os.environ.get("MAX_DOCUMENT_MB", "50" if SUPABASE_STORAGE else "10"))
+# Uploads up to MAX_UPLOAD_MB are accepted; big ones are compressed before storing (apps/core/uploads.py).
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "100"))
+MAX_IMAGE_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+MAX_DOCUMENT_MB = MAX_UPLOAD_MB
 MAX_DOCUMENT_UPLOAD_BYTES = MAX_DOCUMENT_MB * 1024 * 1024
+# What the file storage itself accepts per file, after compression. Cloudinary's free plan: 10 MB for images
+# and documents (raise STORAGE_FILE_LIMIT_MB if you upgrade). Supabase Storage free: 50 MB. Local disk: no limit.
+STORAGE_FILE_LIMIT_MB = int(os.environ.get("STORAGE_FILE_LIMIT_MB",
+                                           "50" if SUPABASE_STORAGE else ("10" if CLOUDINARY_URL else "0")))
+STORAGE_FILE_LIMIT_BYTES = STORAGE_FILE_LIMIT_MB * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_DOCUMENT_UPLOAD_BYTES + 1024 * 1024
 
 # --- Email ---------------------------------------------------------------
@@ -209,7 +216,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.10.2",
+    "VERSION": "0.10.3",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -265,7 +272,11 @@ CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
 # --- Platform ownership ------------------------------------------------------
 # These accounts are always platform (super) admins once their email is verified. They can't be
 # demoted, suspended, banned or deleted from inside NexSpace. Override with a comma-separated list.
-PLATFORM_OWNER_EMAILS = [e.lower() for e in env_list("PLATFORM_OWNER_EMAILS", "arifalotimothy@gmail.com")]
+# OWNER_EMAIL (with OWNER_PASSWORD, used by `manage.py setup_owner` on every deploy) is always an owner.
+OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "").strip().lower()
+PLATFORM_OWNER_EMAILS = [e.lower() for e in env_list("PLATFORM_OWNER_EMAILS", OWNER_EMAIL or "arifalotimothy@gmail.com")]
+if OWNER_EMAIL and OWNER_EMAIL not in PLATFORM_OWNER_EMAILS:
+    PLATFORM_OWNER_EMAILS.append(OWNER_EMAIL)
 if DEBUG:  # the seed_demo platform admin, on your laptop only (seed_demo refuses to run in production)
     PLATFORM_OWNER_EMAILS.append("admin@nexspace.test")
 # Who verifies staff sign-ups: "platform" (platform admins only) or "department" (HOD/department admins).

@@ -90,16 +90,15 @@ def membership(user, conversation):
 
 
 def _save_attachments(message, files):
-    from apps.core.uploads import image_content_type, optimize_image, validate_document_upload
+    from apps.core.uploads import prepare_document, prepare_image
 
     for upload in files:
         content_type = getattr(upload, "content_type", "") or ""
         if content_type.startswith("image/"):
-            content_type = image_content_type(upload)  # validates it really is an image
-            upload = optimize_image(upload)            # resizes and strips location data
+            upload, content_type = prepare_image(upload)  # real image, resized, location data removed
             kind = MessageAttachment.Kind.IMAGE
         else:
-            content_type = validate_document_upload(upload)  # type and size checks
+            upload, content_type = prepare_document(upload)  # checked, compressed if big, fits storage
             kind = MessageAttachment.Kind.FILE
         MessageAttachment.objects.create(message=message, kind=kind, file=upload, original_name=upload.name[:150],
                                          size=upload.size, content_type=content_type)

@@ -1,10 +1,13 @@
 """Shared upload helpers: safe random filenames and real content-type checks."""
+import logging
 import os
 import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from PIL import Image, UnidentifiedImageError
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_FORMATS = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}
 
@@ -22,7 +25,7 @@ def avatar_upload_path(instance, filename):
 def validate_image_upload(file):
     """Check size and the real image format from file contents, not the browser's claim."""
     if file.size > settings.MAX_IMAGE_UPLOAD_BYTES:
-        raise ValidationError("Images must be 5 MB or smaller.")
+        raise ValidationError(f"Images must be {settings.MAX_UPLOAD_MB} MB or smaller.")
     try:
         position = file.tell()
         with Image.open(file) as image:
@@ -139,3 +142,142 @@ def optimize_image(file):
     buffer.seek(0)
     content_type = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}[fmt]
     return InMemoryUploadedFile(buffer, "file", file.name, content_type, buffer.getbuffer().nbytes, None)
+
+
+# --- Compressing big uploads -----------------------------------------------------------
+# People may upload up to MAX_UPLOAD_MB (100 MB by default). Anything bigger than COMPRESS_OVER is
+# compressed first: photos are resized, PDFs have their pictures recompressed, Word/PowerPoint files have
+# their embedded pictures recompressed. What's stored must still fit the storage's own per-file limit
+# (Cloudinary's free plan: 10 MB), and people get a clear message if it doesn't.
+COMPRESS_OVER = 2 * 1024 * 1024
+DOC_IMAGE_EDGE = 1800      # longest side for pictures inside documents
+DOC_IMAGE_QUALITY = 65     # JPEG quality for pictures inside documents
+
+
+def _mb(size):
+    return f"{size / (1024 * 1024):.1f} MB"
+
+
+def _as_upload(data: bytes, name, content_type):
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+
+    return InMemoryUploadedFile(BytesIO(data), "file", name, content_type, len(data), None)
+
+
+def _shrink_picture(raw: bytes, keep_format: str):
+    """Downscale and recompress one embedded picture; returns new bytes or None if not smaller."""
+    from io import BytesIO
+
+    try:
+        with Image.open(BytesIO(raw)) as img:
+            img.thumbnail((DOC_IMAGE_EDGE, DOC_IMAGE_EDGE))
+            out = BytesIO()
+            if keep_format == "PNG":
+                img.save(out, "PNG", optimize=True)
+            else:
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                img.save(out, "JPEG", quality=DOC_IMAGE_QUALITY, optimize=True, progressive=True)
+    except Exception:
+        return None
+    data = out.getvalue()
+    return data if len(data) < len(raw) else None
+
+
+def _compress_pdf(file) -> bytes | None:
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+
+    file.seek(0)
+    writer = PdfWriter(clone_from=PdfReader(file))
+    for page in writer.pages:
+        for picture in page.images:
+            try:
+                image = picture.image
+                if max(image.size) > DOC_IMAGE_EDGE:
+                    image.thumbnail((DOC_IMAGE_EDGE, DOC_IMAGE_EDGE))
+                if image.mode not in ("RGB", "L"):
+                    image = image.convert("RGB")
+                picture.replace(image, quality=DOC_IMAGE_QUALITY)
+            except Exception:
+                continue  # leave pictures pypdf can't re-encode as they are
+        try:
+            page.compress_content_streams()
+        except Exception:
+            pass
+    writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+def _compress_office(file) -> bytes:
+    """Word/PowerPoint files are zip archives: recompress their pictures and repack tightly."""
+    import zipfile
+    from io import BytesIO
+
+    file.seek(0)
+    out = BytesIO()
+    with zipfile.ZipFile(file) as src, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            lower = item.filename.lower()
+            if "/media/" in lower and len(data) > 150 * 1024:
+                if lower.endswith((".jpg", ".jpeg")):
+                    data = _shrink_picture(data, "JPEG") or data
+                elif lower.endswith(".png"):
+                    data = _shrink_picture(data, "PNG") or data
+            dst.writestr(item, data)
+    return out.getvalue()
+
+
+def compress_document(file, content_type):
+    """Return a smaller copy of a big PDF/Word/PowerPoint file, or the original if it can't be shrunk."""
+    if file.size <= COMPRESS_OVER:
+        return file
+    ext = os.path.splitext(file.name)[1].lower()
+    try:
+        if ext == ".pdf":
+            data = _compress_pdf(file)
+        elif ext in (".docx", ".pptx"):
+            data = _compress_office(file)
+        else:
+            data = None  # old .doc/.ppt formats can't be compressed safely
+    except Exception:
+        logger.warning("Couldn't compress %s", file.name, exc_info=True)
+        data = None
+    file.seek(0)
+    if data and len(data) < file.size:
+        logger.info("Compressed %s from %s to %s", file.name, _mb(file.size), _mb(len(data)))
+        return _as_upload(data, file.name, content_type)
+    return file
+
+
+def check_storage_limit(file):
+    """After compressing, the file must still fit the file storage's per-file limit."""
+    limit = settings.STORAGE_FILE_LIMIT_BYTES
+    if limit and file.size > limit:
+        raise ValidationError(
+            f"{file.name} is {_mb(file.size)} even after compressing, and file storage accepts up to "
+            f"{settings.STORAGE_FILE_LIMIT_MB} MB per file. Try splitting it into smaller parts, or saving it "
+            f"with smaller pictures."
+        )
+
+
+def prepare_document(file):
+    """Validate, compress if big, and check it fits storage. Returns (file, content_type)."""
+    content_type = validate_document_upload(file)
+    file = compress_document(file, content_type)
+    check_storage_limit(file)
+    return file, content_type
+
+
+def prepare_image(file):
+    """Validate, resize/strip metadata, and check it fits storage. Returns (file, content_type)."""
+    content_type = image_content_type(file)
+    file = optimize_image(file)
+    check_storage_limit(file)
+    return file, content_type

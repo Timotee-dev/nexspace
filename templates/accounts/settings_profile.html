@@ -13,7 +13,7 @@
       <div class="avatar-edit-actions">
         <label class="btn btn-ghost file-btn">Upload photo<input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" data-avatar-input aria-label="Upload profile photo"></label>
         {% if user.profile.avatar %}<label class="small muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="remove_avatar"> Remove current photo</label>{% endif %}
-        <p class="field-help">JPEG, PNG or WebP, up to 5 MB.</p>
+        <p class="field-help">JPEG, PNG or WebP, up to {{ max_document_mb }} MB. Big photos are resized automatically.</p>
       </div>
     </div>
     {% for error in form.avatar.errors %}<p class="field-error">{{ error }}</p>{% endfor %}

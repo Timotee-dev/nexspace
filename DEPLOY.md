@@ -93,6 +93,17 @@ Render cron jobs cost at least $1/month. Instead, let a free scheduler call NexS
 
 This sends exam and deadline reminders, the weekly summary emails, delivers push notifications, reads new uploads for NexAI and recomputes trending. The URL returns "not found" to anyone without the secret. On the free plan the first call after a quiet period may time out while the server wakes up; the next one works.
 
+## 5c. Your admin account (OWNER_EMAIL / OWNER_PASSWORD)
+
+On Render → Environment, add:
+
+| Key | Value |
+|---|---|
+| `OWNER_EMAIL` | your admin email |
+| `OWNER_PASSWORD` | your admin password |
+
+and end the **Build Command** with `&& python manage.py setup_owner`. Every deploy then creates or repairs that account and makes it the only admin. To change the admin password later, change `OWNER_PASSWORD` here and redeploy.
+
 ## 6. First-time setup (Render → web service → Shell)
 
 ```bash

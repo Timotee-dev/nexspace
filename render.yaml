@@ -2,7 +2,7 @@ services:
   - type: web
     name: nexspace
     runtime: python
-    buildCommand: pip install -r requirements-prod.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+    buildCommand: pip install -r requirements-prod.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py setup_owner
     startCommand: gunicorn config.wsgi:application --workers 2 --timeout 180
     envVars:
       - key: PYTHON_VERSION
@@ -32,6 +32,10 @@ services:
       - key: VAPID_SUBJECT
         sync: false
       - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OWNER_EMAIL
+        sync: false
+      - key: OWNER_PASSWORD
         sync: false
   - type: cron
     name: nexspace-scheduled

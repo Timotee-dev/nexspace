@@ -93,9 +93,9 @@ def test_storage_choice_and_limits():
 
     # Tests run with no storage configured: local disk, 10 MB.
     assert settings.STORAGES["default"]["BACKEND"] == "django.core.files.storage.FileSystemStorage"
-    assert settings.MAX_DOCUMENT_MB == 10
+    assert settings.MAX_DOCUMENT_MB == 100
 
 
 def test_limit_shown_on_compose_page(client, make_user, settings):
     client.force_login(make_user(email="c@example.com"))
-    assert 'data-max-doc-mb="10"' in client.get(reverse("posts:compose")).content.decode()
+    assert 'data-max-doc-mb="100"' in client.get(reverse("posts:compose")).content.decode()

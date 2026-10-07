@@ -4,7 +4,7 @@ from django.db.models import Case, ExpressionWrapper, F, FloatField, Q, Value, W
 from django.utils import timezone
 
 from apps.accounts.models import RoleAssignment
-from apps.core.uploads import validate_document_upload
+from apps.core.uploads import prepare_document
 from apps.posts.services import RateLimited, _limit, require_verified  # noqa: F401
 from apps.reputation import rules
 from apps.reputation import services as nexscore
@@ -46,7 +46,7 @@ def upload(*, user, course, title, file, resource_type, description="", exam_typ
         exam_type = ""
     if file is None:
         raise ValidationError("Choose a file to upload.")
-    content_type = validate_document_upload(file)
+    file, content_type = prepare_document(file)  # checked, compressed if big, fits storage
     resource = Resource.objects.create(
         course=course, title=title[:150], description=(description or "")[:1000], resource_type=resource_type,
         exam_type=exam_type or "", session=session, semester=semester or course.semester,

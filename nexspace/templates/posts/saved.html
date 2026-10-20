@@ -1,0 +1,10 @@
+{% extends "layouts/app.html" %}
+{% block title %}Saved{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Saved</h1><p>Posts you've saved. Only you can see this list.</p></div>
+<div class="feed">
+  {% for post in posts %}{% include "posts/_post_card.html" %}{% empty %}
+  <section class="empty"><svg class="icon"><use href="#i-bookmark"/></svg><h2>Nothing saved yet</h2><p>Tap the bookmark on any post to keep it here for later.</p><a class="btn btn-ghost" href="{% url 'core:home' %}">Browse your feed</a></section>
+  {% endfor %}
+</div>
+{% endblock %}

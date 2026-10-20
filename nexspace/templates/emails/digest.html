@@ -1,0 +1,20 @@
+{% load static %}<!doctype html>
+<html><body style="margin:0;padding:24px;background:#f4f5f9;font-family:Arial,sans-serif;color:#151c2f">
+<table role="presentation" width="100%" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;padding:28px">
+<tr><td>
+<p style="margin:0 0 20px"><img src="{{ site_url }}{% static 'img/icon-192.png' %}" width="40" height="40" alt="" style="vertical-align:middle;border-radius:10px"> <span style="font-weight:800;font-size:20px;vertical-align:middle;margin-left:8px">NexSpace</span></p>
+<p style="margin:0 0 20px">Hi {{ user.get_short_name }}, here's what's happening{% if weekly %} this week{% else %} today{% endif %}.</p>
+{% if events %}<h2 style="font-size:15px;margin:20px 0 8px">Coming up</h2>
+{% for e in events %}<p style="margin:0 0 8px"><b>{{ e.starts_at|date:"D j M, H:i" }}</b> · {{ e.title }}{% if e.target_course %} <span style="color:#535d7a">({{ e.target_course.code }})</span>{% endif %}</p>{% endfor %}{% endif %}
+{% if messages %}<p style="margin:16px 0;padding:12px 14px;background:#fff6dc;border-radius:10px">You have <b>{{ messages }} unread conversation{{ messages|pluralize }}</b>. <a href="{{ site_url }}/messages/" style="color:#7a5600">Read them</a></p>{% endif %}
+{% if unread_count %}<h2 style="font-size:15px;margin:20px 0 8px">{{ unread_count }} new notification{{ unread_count|pluralize }}</h2>
+{% for n in unread %}<p style="margin:0 0 6px;font-size:14px">· {{ n.text }}</p>{% endfor %}{% endif %}
+{% if announcements %}<h2 style="font-size:15px;margin:20px 0 8px">Announcements</h2>
+{% for a in announcements %}<p style="margin:0 0 6px;font-size:14px">· <b>{{ a.title }}</b></p>{% endfor %}{% endif %}
+{% if materials %}<h2 style="font-size:15px;margin:20px 0 8px">New in your courses</h2>
+{% for r in materials %}<p style="margin:0 0 6px;font-size:14px">· {{ r.course.code }}: {{ r.title }}</p>{% endfor %}{% endif %}
+{% if top_posts %}<h2 style="font-size:15px;margin:20px 0 8px">Popular in your department</h2>
+{% for p in top_posts %}<p style="margin:0 0 6px;font-size:14px">· {% if p.title %}{{ p.title }}{% else %}{{ p.body|truncatechars:110 }}{% endif %}</p>{% endfor %}{% endif %}
+<p style="margin:24px 0"><a href="{{ site_url }}" style="background:#f5c451;color:#221a03;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-block">Open NexSpace</a></p>
+<p style="margin:0;font-size:12px;color:#535d7a">You get this {% if weekly %}weekly{% else %}daily{% endif %} summary because of your NexSpace settings. <a href="{{ settings_url }}" style="color:#535d7a">Change how often</a> · <a href="{{ unsubscribe }}" style="color:#535d7a">Stop these emails</a></p>
+</td></tr></table></body></html>

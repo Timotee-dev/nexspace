@@ -1,0 +1,10 @@
+{% load nexspace %}
+<ul class="activity-list">
+  {% for i in items %}
+  <li class="activity-item kind-{{ i.kind }}">
+    <span class="activity-kind">{{ i.kind|title }}</span>
+    <a href="{{ i.url }}" class="activity-text">{{ i.text }}</a>
+    <span class="small muted">{% if i.dept %}{{ i.dept.name }} · {% endif %}{{ i.at|ago }}</span>
+  </li>
+  {% empty %}<li class="muted small">Nothing yet.</li>{% endfor %}
+</ul>

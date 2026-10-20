@@ -1,0 +1,12 @@
+{% extends "layouts/app.html" %}
+{% block title %}Edit comment{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ comment.post.get_absolute_url }}#c-{{ comment.pk }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back</a></div>
+<div class="page-head"><h1>Edit comment</h1></div>
+<form method="post" class="form panel stack">
+  {% csrf_token %}
+  {% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+  <div class="field"><label for="c-body">Comment</label><textarea id="c-body" name="body" rows="5" maxlength="1000" data-count="c-count">{{ body }}</textarea><p class="field-help" id="c-count"></p></div>
+  <div class="form-actions"><a class="btn btn-quiet" href="{{ comment.post.get_absolute_url }}#c-{{ comment.pk }}">Cancel</a><button type="submit" class="btn btn-primary">Save</button></div>
+</form>
+{% endblock %}

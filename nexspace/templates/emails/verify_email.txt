@@ -1,0 +1,10 @@
+Hi {{ user.get_short_name }},
+
+Your NexSpace verification code is: {{ code }}
+
+Open NexSpace, tap "Enter code" on the yellow banner and type it in. The code works for 30 minutes.
+
+Or open this address in your browser:
+{{ link }}
+
+If you didn't create a NexSpace account, ignore this email.

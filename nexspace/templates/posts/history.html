@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Edit history{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ post.get_absolute_url }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back to post</a></div>
+<div class="page-head"><h1>Edit history</h1><p>Earlier versions of this post{% if comments %} and its edited comments{% endif %}, newest first. Visible to the author and moderators.</p></div>
+<section class="stack">
+  <article class="panel stack"><p class="small muted">Current version{% if post.edited_at %} · edited {{ post.edited_at|date:"j M Y, H:i" }}{% endif %}</p>{% if post.title %}<b>{{ post.title }}</b>{% endif %}<div class="post-body">{{ post.body|render_body }}</div></article>
+  {% for r in revisions %}
+  <article class="panel stack revision"><p class="small muted">Before {% if forloop.first %}the latest edit{% else %}an earlier edit{% endif %} · saved {{ r.created_at|date:"j M Y, H:i" }}</p>{% if r.title %}<b>{{ r.title }}</b>{% endif %}<div class="post-body">{{ r.body|render_body }}</div></article>
+  {% empty %}<p class="muted">This post hasn't been edited.</p>{% endfor %}
+</section>
+{% if comments %}
+<section class="stack" style="margin-top:24px"><h2 class="section-title">Edited comments</h2>
+  {% for c in comments %}<article class="panel stack"><p class="small"><b>{{ c.author.display_name }}</b> · now: {{ c.body }}</p>
+    {% for r in c.revisions.all %}<p class="small muted">Before ({{ r.created_at|date:"j M, H:i" }}): {{ r.body }}</p>{% endfor %}</article>{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

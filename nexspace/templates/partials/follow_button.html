@@ -1,0 +1,5 @@
+{# Context: kind ("user"|"topic"), key (username|slug), following (bool), size ("sm"|"") #}
+<form method="post" action="{% if kind == 'user' %}{% url 'social:follow-user' key %}{% else %}{% url 'social:follow-topic' key %}{% endif %}" data-follow="{{ kind }}:{{ key }}">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <button type="submit" class="btn {% if following or size %}btn-ghost{% else %}btn-primary{% endif %}{% if size %} btn-{{ size }}{% endif %}"{% if size %} data-quiet{% endif %} aria-pressed="{% if following %}true{% else %}false{% endif %}">{% if following %}Following{% else %}Follow{% endif %}</button>
+</form>

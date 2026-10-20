@@ -1,0 +1,13 @@
+{% if countdowns %}
+<section class="panel" aria-labelledby="countdown-title">
+  <div class="panel-head"><h2 id="countdown-title">Coming up</h2><a href="{% url 'notices:calendar' %}">Calendar</a></div>
+  <ul class="countdowns">
+    {% for event in countdowns %}
+    <li class="countdown">
+      <span class="countdown-days"><b>{% if event.days_left <= 0 %}Today{% else %}{{ event.days_left }}{% endif %}</b>{% if event.days_left > 0 %}<small>day{{ event.days_left|pluralize }}</small>{% endif %}</span>
+      <span class="countdown-text"><b>{% if event.target_course %}{{ event.target_course.code }} {% endif %}{{ event.get_kind_display }}</b><span class="muted small">{{ event.title }} · {{ event.starts_at|date:"D j M" }}</span></span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

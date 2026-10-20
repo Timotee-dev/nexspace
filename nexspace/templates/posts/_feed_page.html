@@ -1,0 +1,6 @@
+{% for post in posts %}{% include "posts/_post_card.html" %}{% endfor %}
+{% if next_url %}
+<div class="feed-more" data-next="{{ next_url }}&partial=1">
+  <a class="btn btn-ghost" href="{{ next_url }}">Load more</a>
+</div>
+{% endif %}

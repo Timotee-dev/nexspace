@@ -1,0 +1,43 @@
+{% extends "layouts/app.html" %}
+{% block title %}Opportunities{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Opportunities</h1><p>Internships, SIWES, scholarships, hackathons and more, shared in your department.</p></div>
+  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'posts:compose' %}?type=opportunity">Share one</a>{% endif %}
+</div>
+<nav class="chip-row" aria-label="Categories">
+  <a class="chip-link" href="?{% if show_closed %}closed=1{% endif %}" {% if not category %}aria-current="true"{% endif %}>All</a>
+  {% for value, label, n in categories %}<a class="chip-link" href="?category={{ value }}{% if show_closed %}&closed=1{% endif %}" {% if category == value %}aria-current="true"{% endif %}>{{ label }}{% if n %} ({{ n }}){% endif %}</a>{% endfor %}
+</nav>
+<p class="small" style="margin:12px 0"><a href="?{% if category %}category={{ category }}&{% endif %}{% if not show_closed %}closed=1{% endif %}">{% if show_closed %}Hide closed opportunities{% else %}Include closed opportunities{% endif %}</a></p>
+<ul class="opp-list">
+  {% for post in posts %}
+  <li class="opp-card">
+    <p class="small muted">{{ post.opportunity.get_category_display }}{% if post.opportunity.location %} · {{ post.opportunity.location }}{% endif %}</p>
+    <h2><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h2>
+    <p><b>{{ post.opportunity.organization }}</b></p>
+    {% if post.body %}<p class="muted small">{{ post.body|truncatechars:180 }}</p>{% endif %}
+    <p class="small">{% if post.opportunity.deadline %}Deadline: <b>{{ post.opportunity.deadline|date:"j M Y" }}</b>{% else %}No deadline given{% endif %} · Posted by {{ post.display_name }}</p>
+    <div class="opp-actions">
+      {% if post.opportunity.apply_url %}<a class="btn btn-primary btn-sm" href="{{ post.opportunity.apply_url }}" target="_blank" rel="noopener noreferrer nofollow">Apply</a>{% endif %}
+      <form method="post" action="{% url 'posts:bookmark' post.pk %}" data-bookmark="{{ post.pk }}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-ghost btn-sm action-save" aria-pressed="{% if post.is_bookmarked %}true{% else %}false{% endif %}">Save</button></form>
+      {% if post.opportunity.deadline %}
+      <form method="post" action="{% url 'discover:remind' post.pk %}" class="remind-form">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <label class="visually-hidden" for="remind-{{ post.pk }}">Remind me</label>
+        <select id="remind-{{ post.pk }}" name="days" onchange="this.form.submit()">
+          <option value="" {% if not post.reminder_days %}selected{% endif %} disabled>Remind me…</option>
+          {% for d in reminder_choices %}<option value="{{ d }}" {% if post.reminder_days == d %}selected{% endif %}>{{ d }} day{{ d|pluralize }} before</option>{% endfor %}
+          {% if post.reminder_days %}<option value="off">No reminder</option>{% endif %}
+        </select>
+        <noscript><button type="submit" class="btn btn-ghost btn-sm">Set</button></noscript>
+      </form>
+      {% endif %}
+      <a class="btn btn-quiet btn-sm" href="{{ post.get_absolute_url }}" data-share="{{ request.scheme }}://{{ request.get_host }}{{ post.get_absolute_url }}">Share</a>
+    </div>
+  </li>
+  {% empty %}
+  <li class="empty"><h2>No opportunities here yet</h2><p>When classmates share internships, scholarships or hackathons, they'll show up here.</p></li>
+  {% endfor %}
+</ul>
+{% endblock %}

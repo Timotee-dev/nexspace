@@ -1,0 +1,17 @@
+{% extends "layouts/app.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Search{% endblock %}
+{% block content %}
+<form method="get" action="{% url 'search:search' %}" class="search-page-form" role="search" data-live-search>
+  <label for="global-q" class="visually-hidden">Search NexSpace</label>
+  <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+  <input id="global-q" type="search" name="q" value="{{ q }}" placeholder="Search courses, people, posts, past questions…" autocomplete="off" autofocus enterkeyhint="search">
+  {% if only %}<input type="hidden" name="type" value="{{ only }}">{% endif %}
+</form>
+{% if q %}
+<nav class="chip-row" aria-label="Result types">
+  <a class="chip-link" href="?q={{ q|urlencode }}" {% if not only %}aria-current="true"{% endif %}>Everything</a>
+  {% for key, label in groups %}<a class="chip-link" href="?q={{ q|urlencode }}&type={{ key }}" {% if only == key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{% endif %}
+<div data-search-results aria-live="polite">{% include "search/_results.html" %}</div>
+{% endblock %}

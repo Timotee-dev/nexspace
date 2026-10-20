@@ -1,0 +1,30 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Notifications</h1></div>
+  <div class="head-actions">
+    {% if unread_notifications %}<form method="post" action="{% url 'notifications:mark-all' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-ghost btn-sm">Mark all as read</button></form>{% endif %}
+    <a class="icon-btn" href="{% url 'notifications:preferences' %}" aria-label="Notification settings"><svg class="icon"><use href="#i-settings"/></svg></a>
+  </div>
+</div>
+<nav class="chip-row" aria-label="Filter notifications">
+  <a class="chip-link" href="?" {% if not category %}aria-current="true"{% endif %}>All</a>
+  {% for value, label in categories %}<a class="chip-link" href="?category={{ value }}" {% if category == value %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+<ul class="notif-list">
+  {% for n in items %}
+  <li class="notif{% if not n.is_read %} unread{% endif %}{% if n.is_critical %} critical{% endif %}">
+    <a href="{% url 'notifications:open' n.pk %}">
+      {% if n.actor %}{% include "partials/avatar.html" with person=n.actor %}{% else %}<span class="avatar notif-icon" aria-hidden="true"><svg class="icon-sm"><use href="#i-{% if n.category == 'academic' %}school{% elif n.category == 'department' %}megaphone{% elif n.category == 'opportunities' %}bookmark{% else %}bell{% endif %}"/></svg></span>{% endif %}
+      <span class="notif-text"><span>{% if not n.is_read %}<span class="visually-hidden">Unread: </span>{% endif %}{{ n.text }}</span><span class="small muted">{{ n.get_category_display }} · {{ n.created_at|ago }}</span></span>
+      {% if not n.is_read %}<span class="unread-dot" aria-hidden="true"></span>{% endif %}
+    </a>
+  </li>
+  {% empty %}
+  <li class="empty"><svg class="icon"><use href="#i-bell"/></svg><h2>You're all caught up</h2><p>Replies, mentions, new course materials, announcements and reminders show up here.</p></li>
+  {% endfor %}
+</ul>
+{% if next_page %}<div class="feed-more"><a class="btn btn-ghost" href="?{% if category %}category={{ category }}&{% endif %}page={{ next_page }}">Older notifications</a></div>{% endif %}
+{% endblock %}

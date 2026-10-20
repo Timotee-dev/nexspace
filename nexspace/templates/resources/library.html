@@ -1,0 +1,33 @@
+{% extends "layouts/app.html" %}
+{% block title %}Resources{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Resources</h1><p>Past questions, lecture notes and slides from every course in your department.</p></div>
+  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'resources:upload' %}">Upload</a>{% endif %}
+</div>
+<nav class="settings-nav" aria-label="Browse">
+  <a href="{% url 'spaces:list' %}">Spaces</a>
+  <a href="{% url 'spaces:courses' %}">Courses</a>
+  <a href="{% url 'resources:library' %}" aria-current="page">Resources</a>
+</nav>
+<form method="get" class="filters" role="search">
+  <div class="field filters-q"><label for="q" class="visually-hidden">Search</label><input id="q" type="search" name="q" value="{{ params.q }}" placeholder="Search, e.g. CSC 301 sorting"></div>
+  <details class="filter-panel"{% if filtered %} open{% endif %} data-open-desktop>
+  <summary class="btn btn-ghost btn-sm">Filters and sort</summary>
+  <div class="filter-grid">
+  <div class="field"><label for="f-course">Course</label><select id="f-course" name="course"><option value="">All courses</option>{% for c in courses %}<option value="{{ c.slug }}" {% if params.course == c.slug %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-type">Type</label><select id="f-type" name="type"><option value="">All types</option>{% for v, l in types %}<option value="{{ v }}" {% if params.resource_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-level">Level</label><select id="f-level" name="level"><option value="">All levels</option>{% for v, l in levels %}<option value="{{ v }}" {% if params.level == v|stringformat:"s" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-session">Year</label><select id="f-session" name="session"><option value="">Any year</option>{% for s in sessions %}<option value="{{ s.pk }}" {% if params.session == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-sem">Semester</label><select id="f-sem" name="semester"><option value="">Both</option>{% for v, l in semesters %}<option value="{{ v }}" {% if params.semester == v|stringformat:"s" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-sort">Sort</label><select id="f-sort" name="sort">{% for v, l in sorts.items %}<option value="{{ v }}" {% if params.sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  </div>
+  </details>
+  <div class="filters-actions"><button type="submit" class="btn btn-primary">Search</button>{% if filtered %}<a class="btn btn-quiet" href="{% url 'resources:library' %}">Clear</a>{% endif %}</div>
+</form>
+{% if resources %}
+<ul class="resource-list">{% for resource in resources %}{% include "partials/resource_row.html" %}{% endfor %}</ul>
+{% else %}
+<div class="empty"><h2>{% if filtered %}No resources match those filters{% else %}No resources have been uploaded yet{% endif %}</h2><p>{% if filtered %}Try fewer filters or a shorter search.{% else %}Course reps and classmates can upload past questions and notes.{% endif %}</p></div>
+{% endif %}
+{% endblock %}

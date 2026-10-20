@@ -1,0 +1,14 @@
+<section class="panel" aria-labelledby="completion-title">
+  <div class="panel-head"><h2 id="completion-title">Finish your profile</h2></div>
+  <ul class="checklist">
+    {% for step in steps %}
+    <li>
+      {% if step.done %}
+      <span class="done-row"><span class="check-dot"><svg class="icon-sm" style="width:14px;height:14px"><use href="#i-check"/></svg></span><span class="check-label">{{ step.label }}</span><span class="visually-hidden">(done)</span></span>
+      {% else %}
+      <a href="{% if step.key == 'interests' %}{% url 'accounts:onboarding' %}{% else %}{% url 'accounts:settings-profile' %}{% endif %}"><span class="check-dot"></span><span class="check-label">{{ step.label }}</span></a>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>

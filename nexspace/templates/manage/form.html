@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ heading }} · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<form method="post" class="form panel" novalidate>
+  {% csrf_token %}<h2 class="section-title">{{ heading }}</h2>
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% for field in form %}
+    {% if field.widget_type == "checkbox" %}<label class="toggle-row" for="{{ field.id_for_label }}"><span>{{ field.label }}</span><span class="switch">{{ field }}<span></span></span></label>
+    {% else %}{% include "partials/field.html" %}{% endif %}
+  {% endfor %}
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url back %}">Cancel</a><button type="submit" class="btn btn-primary">Save</button></div>
+</form>
+{% endblock %}
+{% block rightbar %}{% endblock %}

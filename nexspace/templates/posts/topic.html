@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}#{{ topic.slug }}{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>#{{ topic.slug }}</h1><p>{{ topic.name }} · <span data-follower-count>{{ follower_count }}</span> follower{{ follower_count|pluralize }}</p></div>
+  {% include "partials/follow_button.html" with kind="topic" key=topic.slug following=is_following %}
+</div>
+<div class="feed">
+  {% for post in posts %}{% include "posts/_post_card.html" %}{% empty %}
+  <section class="empty"><h2>No posts in #{{ topic.slug }} yet</h2><p>Tag a post with this topic when you write it.</p><a class="btn btn-primary" href="{% url 'posts:compose' %}">Write a post</a></section>
+  {% endfor %}
+</div>
+{% endblock %}

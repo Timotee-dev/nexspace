@@ -1,0 +1,70 @@
+{% extends "layouts/app.html" %}
+{% block title %}Explore{% endblock %}
+{% block content %}
+<a class="search-launch" href="{% url 'search:search' %}"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span>Search NexSpace</span></a>
+
+<a class="nexai-launch" href="{% url 'nexai:ask' %}"><span class="nexai-mark" aria-hidden="true">✦</span><span>Ask NexAI about your courses</span></a>
+<nav class="quick-links" aria-label="Go to">
+  <a href="{% url 'discover:opportunities' %}"><svg class="icon"><use href="#i-briefcase"/></svg>Opportunities</a>
+  <a href="{% url 'resources:library' %}"><svg class="icon"><use href="#i-file"/></svg>Resources</a>
+  <a href="{% url 'groups:list' %}"><svg class="icon"><use href="#i-users"/></svg>Study groups</a>
+  <a href="{% url 'notices:calendar' %}"><svg class="icon"><use href="#i-calendar"/></svg>Calendar</a>
+  <a href="{% url 'notices:announcements' %}"><svg class="icon"><use href="#i-megaphone"/></svg>Notices</a>
+  <a href="{% url 'posts:saved' %}"><svg class="icon"><use href="#i-bookmark"/></svg>Saved</a>
+</nav>
+
+<section class="explore-section" aria-labelledby="trend-title">
+  <div class="panel-head"><h2 id="trend-title" class="section-title">Trending in your department</h2></div>
+  {% if trending_topics %}<p class="post-topics">{% for t in trending_topics %}<a href="{% url 'posts:topic' t.slug %}">#{{ t.slug }}</a>{% endfor %}</p>{% endif %}
+  <div class="feed">
+    {% for post in trending %}{% include "posts/_post_card.html" %}{% empty %}
+    <div class="empty empty-sm"><p>Nothing is trending yet. Posts with lots of recent votes and replies show up here.</p></div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if recommended_spaces %}
+<section class="explore-section" aria-labelledby="rec-title">
+  <div class="panel-head"><h2 id="rec-title" class="section-title">Recommended Spaces</h2><a href="{% url 'spaces:list' %}">All Spaces</a></div>
+  <ul class="space-grid">{% for space in recommended_spaces %}{% include "spaces/_card.html" with membership=None %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if courses %}
+<section class="explore-section" aria-labelledby="courses-title">
+  <div class="panel-head"><h2 id="courses-title" class="section-title">Courses for your level</h2><a href="{% url 'spaces:courses' %}">All courses</a></div>
+  <ul class="course-list">{% for course in courses %}<li class="course-row"><a href="{{ course.get_absolute_url }}" class="course-row-link"><span class="course-code">{{ course.code }}</span><span class="course-row-text"><b>{{ course.title }}</b><span class="small muted">{{ course.get_semester_display }}</span></span></a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="explore-section" aria-labelledby="opp-title">
+  <div class="panel-head"><h2 id="opp-title" class="section-title">Opportunities</h2><a href="{% url 'discover:opportunities' %}">See all</a></div>
+  {% if opportunities %}
+  <ul class="opp-mini">{% for post in opportunities %}<li><a href="{{ post.get_absolute_url }}"><b>{{ post.title }}</b><span class="small muted">{{ post.opportunity.organization }} · {{ post.opportunity.get_category_display }}{% if post.opportunity.deadline %} · Closes {{ post.opportunity.deadline|date:"j M" }}{% endif %}</span></a></li>{% endfor %}</ul>
+  {% else %}<div class="empty empty-sm"><p>No open opportunities right now.</p></div>{% endif %}
+</section>
+
+{% if resources %}
+<section class="explore-section" aria-labelledby="res-title">
+  <div class="panel-head"><h2 id="res-title" class="section-title">Most downloaded resources</h2><a href="{% url 'resources:library' %}?sort=downloads">Library</a></div>
+  <ul class="resource-list">{% for resource in resources %}{% include "partials/resource_row.html" %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if people %}
+<section class="explore-section" aria-labelledby="people-title2">
+  <div class="panel-head"><h2 id="people-title2" class="section-title">People to follow</h2></div>
+  <ul class="suggest-list">
+    {% for person in people %}
+    <li><a href="{% url 'accounts:profile' person.username %}" class="suggest-person">{% include "partials/avatar.html" with person=person %}<span><b>{{ person.full_name }}</b><span class="muted small">{{ person.level_label }} · {{ person.profile.nexscore }} NexScore</span></span></a>
+      {% include "partials/follow_button.html" with kind="user" key=person.username following=False size="sm" %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="explore-section" aria-labelledby="pop-title">
+  <div class="panel-head"><h2 id="pop-title" class="section-title">Popular Spaces</h2></div>
+  <ul class="space-grid">{% for space in popular_spaces %}<li class="space-card"><a href="{{ space.get_absolute_url }}" class="space-card-link"><span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span><span class="space-card-text"><b>{{ space.name }}</b><span class="small muted">{{ space.member_count }} member{{ space.member_count|pluralize }}</span></span></a></li>{% endfor %}</ul>
+</section>
+{% endblock %}

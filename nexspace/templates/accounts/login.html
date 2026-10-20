@@ -1,0 +1,22 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Log in{% endblock %}
+{% block card %}
+<header>
+  <h1>Welcome back</h1>
+  <p>Log in with the email you signed up with.</p>
+</header>
+{% if locked %}
+<div class="form-errors" role="alert">Too many failed attempts. For your security, try again in 15 minutes or reset your password.</div>
+{% elif form.non_field_errors %}
+<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>
+{% endif %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.GET.next }}">
+  {% include "partials/field.html" with field=form.email %}
+  {% include "partials/field.html" with field=form.password %}
+  <div class="inline-link-row"><a href="{% url 'accounts:password-reset' %}">Forgot password?</a></div>
+  <button type="submit" class="btn btn-primary btn-block">Log in</button>
+</form>
+<p class="auth-foot">New to NexSpace? <a href="{% url 'accounts:signup' %}">Create an account</a></p>
+{% endblock %}

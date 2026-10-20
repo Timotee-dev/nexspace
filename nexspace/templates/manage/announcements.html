@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}Announcements · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="space-toolbar"><span></span><a class="btn btn-primary btn-sm" href="{% url 'notices:announcement-create' %}">New announcement</a></div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Title</th><th scope="col">For</th><th scope="col">Status</th><th scope="col"></th></tr></thead><tbody>
+{% for a in items %}<tr><td><a href="{% url 'notices:announcement' a.pk %}">{{ a.title }}</a><br><span class="small muted">{{ a.created_by.full_name|default:"—" }} · {{ a.created_at|date:"j M Y" }}</span></td><td>{{ a.audience_label }}</td>
+<td>{% if a.is_removed %}Removed{% elif a.is_expired %}Archived{% else %}Active{% endif %}</td>
+<td><form method="post" action="{% url 'manage:announcement-remove' a.pk %}">{% csrf_token %}<button class="btn btn-quiet btn-sm">{% if a.is_removed %}Restore{% else %}Remove{% endif %}</button></form></td></tr>
+{% empty %}<tr><td colspan="4" class="muted">No announcements yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
+{% block rightbar %}{% endblock %}

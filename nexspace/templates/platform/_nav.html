@@ -1,0 +1,12 @@
+<div class="manage-head">
+  <div><h1>Platform</h1><p class="muted small">Everything on NexSpace, across every department. Only platform admins see this.</p></div>
+  <a class="btn btn-ghost btn-sm" href="/django-admin/">Open database admin</a>
+</div>
+<nav class="settings-nav" aria-label="Platform sections">
+  <a href="{% url 'platform:overview' %}" {% if section == "overview" %}aria-current="page"{% endif %}>Overview</a>
+  <a href="{% url 'platform:staff' %}" {% if section == "staff" %}aria-current="page"{% endif %}>Staff to verify{% if pending_staff_count %} <span class="tab-count">{{ pending_staff_count }}</span>{% endif %}</a>
+  <a href="{% url 'platform:people' %}" {% if section == "people" %}aria-current="page"{% endif %}>People</a>
+  <a href="{% url 'platform:activity' %}" {% if section == "activity" %}aria-current="page"{% endif %}>Activity</a>
+  <a href="{% url 'platform:audit' %}" {% if section == "audit" %}aria-current="page"{% endif %}>Audit log</a>
+  <a href="{% url 'platform:database' %}" {% if section == "database" %}aria-current="page"{% endif %}>Database</a>
+</nav>

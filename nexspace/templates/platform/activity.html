@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}Activity · Platform{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "platform/_nav.html" %}
+<form method="get" class="filters admin-filters">
+  <div class="field"><label for="a-dept">Department</label><select id="a-dept" name="dept"><option value="">All departments</option>{% for d in departments %}<option value="{{ d.pk }}" {% if dept and dept.pk == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="a-kind">Type</label><select id="a-kind" name="kind"><option value="">Everything</option>{% for v, l in types %}<option value="{{ v }}" {% if kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="filters-actions"><button class="btn btn-primary" type="submit">Show</button></div>
+</form>
+<div class="panel">{% include "platform/_activity.html" with items=items %}</div>
+<p class="small muted" style="margin-top:8px">Anonymous posts stay anonymous here too. To see who wrote one, use "Reveal author" on the post; every reveal is logged.</p>
+{% endblock %}

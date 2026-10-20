@@ -1,0 +1,10 @@
+{% if sources %}
+<details class="sources"{% if open %} open{% endif %}>
+  <summary>{{ sources|length }} source{{ sources|length|pluralize }} from your course materials</summary>
+  <ol>
+    {% for s in sources %}
+    <li id="{{ prefix }}-{{ s.n }}"><a href="{{ s.url }}"><b>[{{ s.n }}]</b> {{ s.label }}</a><p class="small muted">{{ s.excerpt }}…</p></li>
+    {% endfor %}
+  </ol>
+</details>
+{% endif %}

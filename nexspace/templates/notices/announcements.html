@@ -1,0 +1,24 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Announcements</h1><p>Official notices for you from your department and course reps.</p></div>
+  {% if can_publish %}<a class="btn btn-primary" href="{% url 'notices:announcement-create' %}">New announcement</a>{% endif %}
+</div>
+<nav class="settings-nav" aria-label="Announcements">
+  <a href="{% url 'notices:announcements' %}" {% if not archive %}aria-current="page"{% endif %}>Active</a>
+  <a href="?view=archive" {% if archive %}aria-current="page"{% endif %}>Archive</a>
+</nav>
+<ul class="announcement-list">
+  {% for item in items %}
+  <li class="announcement priority-{{ item.priority }}">
+    <p class="small muted">{% if item.priority != "normal" %}<span class="tag tag-{{ item.priority }}">{{ item.get_priority_display }}</span> {% endif %}{{ item.audience_label }} · {{ item.created_at|date:"j M Y" }}{% if item.expires_at %} · {% if archive %}Expired{% else %}Until{% endif %} {{ item.expires_at|date:"j M" }}{% endif %}</p>
+    <h2><a href="{% url 'notices:announcement' item.pk %}">{{ item.title }}</a></h2>
+    <div class="post-body">{{ item.body|truncatechars:280|render_body }}</div>
+  </li>
+  {% empty %}
+  <li class="empty"><h2>{% if archive %}No archived announcements{% else %}You're all caught up{% endif %}</h2><p>{% if archive %}Expired announcements move here.{% else %}There are no active announcements for you right now.{% endif %}</p></li>
+  {% endfor %}
+</ul>
+{% endblock %}

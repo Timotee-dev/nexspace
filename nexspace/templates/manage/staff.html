@@ -1,0 +1,36 @@
+{% extends "layouts/app.html" %}
+{% block title %}Staff · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<section class="stack">
+  <h2 class="section-title">Waiting for verification</h2>
+  <p class="small muted">Only verify people you know hold that position. Verifying gives them its powers: HOD → full department admin; Lecturer → their courses (materials, announcements, dates, managing the course Space); Level Adviser → their level; Exam Officer → exam and test dates across the department.</p>
+  {% for s in pending %}
+  <article class="panel stack">
+    <div class="request-row">
+      <span><b>{{ s.get_title_display }} {{ s.user.full_name }}</b> <span class="tag tag-staff">{{ s.get_position_display }}</span><br><span class="small muted">{{ s.user.email }}{% if s.staff_id %} · Staff ID {{ s.staff_id }}{% endif %} · signed up {{ s.created_at|date:"j M Y" }}</span></span>
+    </div>
+    {% if s.requested_courses.all %}<p class="small">Says they teach: {% for c in s.requested_courses.all %}<b>{{ c.code }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    {% if s.requested_level %}<p class="small">Says they advise: <b>{{ s.requested_level }} Level</b></p>{% endif %}
+    {% if not can_verify %}<p class="small muted">The NexSpace platform admin verifies staff accounts. You'll see this person's staff badge once they're verified.</p>{% else %}
+    <form method="post" action="{% url 'manage:staff-decision' s.pk %}" class="mod-actions">{% csrf_token %}
+      <label class="visually-hidden" for="note-{{ s.pk }}">Note</label>
+      <input id="note-{{ s.pk }}" name="note" maxlength="300" placeholder="Reason, if you reject (they'll see it)">
+      <div class="mod-buttons"><button name="decision" value="approve" class="btn btn-primary btn-sm">Verify</button><button name="decision" value="reject" class="btn btn-ghost btn-sm">Reject</button></div>
+    </form>{% endif %}
+  </article>
+  {% empty %}<div class="empty empty-sm"><p>No staff accounts are waiting.</p></div>{% endfor %}
+</section>
+<section class="stack" style="margin-top:28px">
+  <h2 class="section-title">Verified staff</h2>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Name</th><th scope="col">Position</th><th scope="col">Responsibilities</th><th scope="col"></th></tr></thead><tbody>
+  {% for s in verified %}<tr><td><b>{{ s.get_title_display }} {{ s.user.full_name }}</b><br><span class="small muted">{{ s.user.email }}</span></td><td>{{ s.get_position_display }}</td>
+    <td class="small">{% for ra in s.user.role_assignments.all %}{{ ra.get_role_display }}{% if ra.course %} {{ ra.course.code }}{% elif ra.level %} {{ ra.level }}L{% endif %}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+    <td><a href="{% url 'manage:user' s.user.pk %}">Manage</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">No verified staff yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="small muted">To add or change a lecturer's courses later, open <b>Manage</b> and assign the <i>Lecturer</i> role for another course.</p>
+</section>
+{% if rejected %}<section class="stack" style="margin-top:28px"><h2 class="section-title">Not verified</h2><ul class="member-list">{% for s in rejected %}<li class="small">{{ s.user.full_name }} · {{ s.get_position_display }}{% if s.note %} · "{{ s.note }}"{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+{% endblock %}

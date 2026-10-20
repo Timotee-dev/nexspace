@@ -1,0 +1,11 @@
+{# Vote pill. Context: kind ("post"|"comment"), obj, up, down. Own content shows the score only. #}
+{% if obj.author_id == user.pk %}
+<span class="vote vote-own" title="Score"><svg class="icon-sm"><use href="#i-up"/></svg><span class="vote-score">{{ obj.score }}</span></span>
+{% else %}
+<form class="vote" method="post" action="{% if kind == 'post' %}{% url 'posts:vote' obj.pk %}{% else %}{% url 'posts:comment-vote' obj.pk %}{% endif %}" data-vote="{{ kind }}:{{ obj.pk }}" data-state="{% if up %}1{% elif down %}-1{% else %}0{% endif %}">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <button type="submit" name="value" value="{% if up %}0{% else %}1{% endif %}" class="vote-btn up" aria-pressed="{% if up %}true{% else %}false{% endif %}" aria-label="Upvote"><svg class="icon-sm"><use href="#i-up"/></svg></button>
+  <span class="vote-score" aria-live="polite">{{ obj.score }}</span>
+  <button type="submit" name="value" value="{% if down %}0{% else %}-1{% endif %}" class="vote-btn down" aria-pressed="{% if down %}true{% else %}false{% endif %}" aria-label="Downvote"><svg class="icon-sm"><use href="#i-down"/></svg></button>
+</form>
+{% endif %}

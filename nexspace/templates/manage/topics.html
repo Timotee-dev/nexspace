@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+{% block title %}Topics · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Topic</th><th scope="col">Posts</th><th scope="col"></th></tr></thead><tbody>
+{% for t in topics %}<tr{% if not t.is_active %} class="muted"{% endif %}><td>#{{ t.slug }} <span class="small muted">{{ t.name }}</span></td><td>{{ t.n }}</td>
+<td><form method="post" action="{% url 'manage:topic-toggle' t.pk %}">{% csrf_token %}<button class="btn btn-quiet btn-sm">{% if t.is_active %}Hide{% else %}Show{% endif %}</button></form></td></tr>{% endfor %}
+</tbody></table></div>
+<form method="post" class="form panel" style="margin-top:16px" novalidate>{% csrf_token %}<h2 class="section-title">Add a topic</h2>
+  {% for field in form %}{% if field.widget_type == "checkbox" %}<label class="toggle-row" for="{{ field.id_for_label }}"><span>{{ field.label }}</span><span class="switch">{{ field }}<span></span></span></label>{% else %}{% include "partials/field.html" %}{% endif %}{% endfor %}
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Add topic</button></div>
+</form>
+{% endblock %}
+{% block rightbar %}{% endblock %}

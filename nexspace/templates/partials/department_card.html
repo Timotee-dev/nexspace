@@ -1,0 +1,8 @@
+{% if user.department %}
+<section class="panel" aria-labelledby="dept-card-title">
+  <div class="panel-head"><h2 id="dept-card-title">Your department</h2></div>
+  <p><b>{{ user.department.name }}</b></p>
+  <p class="muted small">{{ user.department.faculty.name }}, {{ user.department.faculty.university.name }}</p>
+  {% if user.level %}<p class="small" style="margin-top:12px">You're in <b>{{ user.level_label }}</b>.</p>{% endif %}
+</section>
+{% endif %}

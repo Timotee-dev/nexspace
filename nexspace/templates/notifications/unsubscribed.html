@@ -1,0 +1,15 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Email digests{% endblock %}
+{% block card %}
+<header>
+{% if not ok %}
+  <h1>This link has expired</h1><p>Turn digest emails off in Settings → Notifications instead.</p>
+{% elif confirm %}
+  <h1>Stop digest emails?</h1><p>You'll stop getting the NexSpace summary email. Everything else — notifications inside NexSpace and important emails like password resets — stays on.</p>
+{% else %}
+  <h1>Digest emails are off</h1><p>You won't get NexSpace summary emails any more. You can turn them back on in Settings → Notifications.</p>
+{% endif %}
+</header>
+{% if ok and confirm %}<form method="post" class="form">{% csrf_token %}<button class="btn btn-primary btn-block">Turn off digest emails</button></form>{% endif %}
+<p class="auth-switch"><a href="/">Go to NexSpace</a></p>
+{% endblock %}

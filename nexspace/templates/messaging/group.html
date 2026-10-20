@@ -1,0 +1,41 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}{{ group.title }} · Group{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ group.get_absolute_url }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back to chat</a></div>
+<div class="page-head"><h1>{{ group.title }}</h1><p>{{ members|length }} of up to {{ max }} people{% if group.created_by %} · created by {{ group.created_by.full_name }}{% endif %}</p></div>
+
+{% if is_admin %}
+<form method="post" class="form panel stack">{% csrf_token %}<input type="hidden" name="action" value="rename">
+  <div class="field"><label for="g-name">Group name</label><input id="g-name" name="title" maxlength="80" value="{{ group.title }}" required></div>
+  <div class="form-actions"><button class="btn btn-ghost">Rename</button></div>
+</form>
+{% endif %}
+
+<section class="panel" style="margin-top:16px">
+  <h2 class="section-title">People</h2>
+  <ul class="member-list">
+    {% for m in members %}
+    <li class="request-row"><a href="{% url 'accounts:profile' m.user.username %}" class="suggest-person">{% include "partials/avatar.html" with person=m.user %}<span><b>{{ m.user.display_name }}</b>{% if m.user_id == user.pk %} <span class="tag">You</span>{% endif %}<span class="small muted">{% if m.is_admin %}Group admin{% else %}@{{ m.user.username }}{% endif %}</span></span></a>
+      {% if is_admin and m.user_id != user.pk %}<div class="request-actions">
+        {% if not m.is_admin %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="admin"><input type="hidden" name="user" value="{{ m.user_id }}"><button class="btn btn-quiet btn-sm">Make admin</button></form>{% endif %}
+        <form method="post" data-confirm="Remove {{ m.user.full_name }} from the group?">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="user" value="{{ m.user_id }}"><button class="btn btn-quiet btn-sm">Remove</button></form>
+      </div>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if is_admin %}
+<form method="post" class="form panel stack" style="margin-top:16px">{% csrf_token %}<input type="hidden" name="action" value="add">
+  <h2 class="section-title">Add people</h2>
+  {% include "messaging/_people_picker.html" with people=addable %}
+  {% if addable %}<div class="form-actions"><button class="btn btn-primary">Add to group</button></div>{% endif %}
+</form>
+{% endif %}
+
+<form method="post" action="{% url 'messaging:action' group.pk %}" class="panel" style="margin-top:16px" data-confirm="Leave this group?">{% csrf_token %}
+  <p class="small muted">You'll stop getting its messages. Someone in the group can add you back.</p>
+  <button name="action" value="leave" class="btn btn-danger">Leave group</button>
+</form>
+{% endblock %}

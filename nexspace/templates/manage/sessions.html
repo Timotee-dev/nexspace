@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% block title %}Sessions · Admin{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "manage/_nav.html" %}
+<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Session</th><th scope="col">Starts</th><th scope="col"></th></tr></thead><tbody>
+{% for s in sessions %}<tr><td><b>{{ s.name }}</b>{% if s.is_current %} <span class="tag tag-official">Current</span>{% endif %}</td><td>{{ s.starts_on|date:"j M Y"|default:"—" }}</td>
+<td>{% if not s.is_current %}<form method="post" action="{% url 'manage:session-current' s.pk %}">{% csrf_token %}<button class="btn btn-quiet btn-sm">Make current</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="3" class="muted">No sessions yet.</td></tr>{% endfor %}</tbody></table></div>
+<form method="post" class="form panel" style="margin-top:16px" novalidate>{% csrf_token %}<h2 class="section-title">Add a session</h2>
+  <div class="form-row two">{% include "partials/field.html" with field=form.name %}{% include "partials/field.html" with field=form.starts_on %}</div>
+  <label class="toggle-row" for="{{ form.is_current.id_for_label }}"><span>Current session</span><span class="switch">{{ form.is_current }}<span></span></span></label>
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Add session</button></div>
+</form>
+{% endblock %}
+{% block rightbar %}{% endblock %}

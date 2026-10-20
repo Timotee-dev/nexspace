@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% load nexai %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{{ back }}"><svg class="icon-sm"><use href="#i-back"/></svg>Back</a></div>
+<article class="panel stack">
+  <p class="small muted"><span class="nexai-mark" aria-hidden="true">✦</span> NexAI</p>
+  <h1 class="resource-h1">{{ title }}</h1>
+  <div class="answer">{{ result.answer|render_answer:"src" }}</div>
+  {% include "nexai/_sources.html" with sources=result.sources prefix="src" %}
+  <p class="small muted">Written by NexAI from the sources above. Check anything important against the original.</p>
+</article>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% load nexspace %}
+{% if not q %}
+  <div class="empty empty-sm"><p>Try a course code like <b>CSC 301</b>, a topic like <b>sorting</b>, or a classmate's name.</p></div>
+{% elif too_short %}
+  <div class="empty empty-sm"><p>Type at least 2 characters.</p></div>
+{% elif not results %}
+  <div class="empty"><h2>No results for "{{ q }}"</h2><p>Check the spelling, try fewer words, or search for a course code.</p></div>
+{% else %}
+  {% for key, label in groups %}{% with items=results|get_item:key %}{% if items %}
+  <section class="search-group" aria-labelledby="sg-{{ key }}">
+    <div class="panel-head"><h2 id="sg-{{ key }}" class="section-title">{{ label }}</h2>{% if not only %}<a href="?q={{ q|urlencode }}&type={{ key }}">See all</a>{% endif %}</div>
+    {% if key == "courses" %}
+      <ul class="course-list">{% for course in items %}<li class="course-row"><a href="{{ course.get_absolute_url }}" class="course-row-link"><span class="course-code">{{ course.code }}</span><span class="course-row-text"><b>{{ course.title }}</b><span class="small muted">{{ course.get_level_display }} · {{ course.get_semester_display }}</span></span></a></li>{% endfor %}</ul>
+    {% elif key == "spaces" %}
+      <ul class="space-grid">{% for space in items %}<li class="space-card"><a href="{{ space.get_absolute_url }}" class="space-card-link"><span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span><span class="space-card-text"><b>{{ space.name }}</b><span class="small muted">{{ space.member_count }} member{{ space.member_count|pluralize }}</span></span></a></li>{% endfor %}</ul>
+    {% elif key == "resources" %}
+      <ul class="resource-list">{% for resource in items %}{% include "partials/resource_row.html" %}{% endfor %}</ul>
+    {% elif key == "posts" or key == "opportunities" %}
+      <div class="feed">{% for post in items %}{% include "posts/_post_card.html" %}{% endfor %}</div>
+    {% elif key == "people" %}
+      <ul class="member-list">{% for person in items %}<li><a href="{% url 'accounts:profile' person.username %}" class="suggest-person">{% include "partials/avatar.html" with person=person %}<span><b>{{ person.full_name }}</b><span class="small muted">@{{ person.username }} · {{ person.level_label }}</span></span></a></li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+  {% endif %}{% endwith %}{% endfor %}
+{% endif %}

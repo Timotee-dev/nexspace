@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ heading }}</h1></div>
+<form method="post" enctype="multipart/form-data" class="form panel audience-form" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% for field in form %}
+    {% if field.name == "audience" %}
+      {% include "partials/field.html" %}
+    {% elif field.name == "target_level" %}<div class="aud aud-level">{% include "partials/field.html" %}</div>
+    {% elif field.name == "target_course" %}<div class="aud aud-course">{% include "partials/field.html" %}</div>
+    {% elif field.name == "target_space" %}<div class="aud aud-space">{% include "partials/field.html" %}</div>
+    {% else %}{% include "partials/field.html" %}{% endif %}
+  {% endfor %}
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'core:home' %}">Cancel</a><button type="submit" class="btn btn-primary">{{ submit }}</button></div>
+</form>
+{% endblock %}

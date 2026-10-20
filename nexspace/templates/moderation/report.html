@@ -1,0 +1,14 @@
+{% extends "layouts/app.html" %}
+{% block title %}Report{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Report this {{ target_type }}</h1><p class="muted">"{{ label }}"</p></div>
+<form method="post" class="form panel">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  <fieldset class="field"><legend>What's wrong?</legend>
+    {% for value, text in reasons %}<label class="choice"><input type="radio" name="reason" value="{{ value }}" required><span class="choice-text">{{ text }}</span></label>{% endfor %}
+  </fieldset>
+  <div class="field"><label for="details">Anything moderators should know? <span class="optional">(required for "Something else")</span></label><textarea id="details" name="details" rows="3" maxlength="500"></textarea></div>
+  <p class="field-help">Reports are private. The person you report won't see who reported them. Content reported by 5 people is hidden until a moderator reviews it.</p>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ next }}">Cancel</a><button type="submit" class="btn btn-primary">Send report</button></div>
+</form>
+{% endblock %}

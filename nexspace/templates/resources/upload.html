@@ -1,0 +1,26 @@
+{% extends "layouts/app.html" %}
+{% block title %}Upload a resource{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Upload a resource</h1><p>It's published straight away. Anyone can report it if something's wrong.</p></div>
+{% if not user.can_write %}
+<div class="empty"><h2>{% if user.is_suspended %}Your account is suspended{% else %}Verify your email to upload{% endif %}</h2></div>
+{% else %}
+<form method="post" enctype="multipart/form-data" class="form panel" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.course %}
+    {% include "partials/field.html" with field=form.resource_type %}
+  </div>
+  {% include "partials/field.html" with field=form.title %}
+  <div class="form-row two">
+    {% include "partials/field.html" with field=form.session %}
+    {% include "partials/field.html" with field=form.semester %}
+  </div>
+  {% include "partials/field.html" with field=form.exam_type %}
+  {% include "partials/field.html" with field=form.description optional=True %}
+  {% include "partials/field.html" with field=form.file %}
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'resources:library' %}">Cancel</a><button type="submit" class="btn btn-primary">Publish</button></div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}Platform{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "platform/_nav.html" %}
+
+<section class="dash-section" aria-labelledby="health-title">
+  <div class="panel-head"><h2 id="health-title" class="section-title">System health</h2>
+    <form method="post" action="{% url 'platform:run-jobs' %}">{% csrf_token %}<button class="btn btn-ghost btn-sm">Run scheduled jobs now</button></form></div>
+  <ul class="health-grid">
+    {% for name, ok, detail in health %}<li class="health {% if ok %}ok{% else %}warn{% endif %}"><span class="health-dot" aria-hidden="true"></span><span><b>{{ name }}</b><span class="small muted">{% if ok %}OK · {% else %}Check · {% endif %}{{ detail }}</span></span></li>{% endfor %}
+  </ul>
+</section>
+
+<section class="dash-section" aria-labelledby="totals-title">
+  <h2 id="totals-title" class="section-title">Across NexSpace</h2>
+  <dl class="kpi-grid">
+    <div class="kpi"><dt>Members</dt><dd>{{ totals.users }}</dd><dd class="kpi-note">{{ totals.new_7 }} joined this week</dd></div>
+    <div class="kpi"><dt>Active this week</dt><dd>{{ totals.active_7 }}</dd><dd class="kpi-note">{{ totals.posts_7 }} posts · {{ totals.comments_7 }} comments</dd></div>
+    <div class="kpi"><dt>Open reports</dt><dd>{{ totals.open_reports }}</dd><dd class="kpi-note">{{ totals.suspended }} suspended · {{ totals.banned }} banned</dd></div>
+    <div class="kpi"><dt>Resources</dt><dd>{{ totals.resources }}</dd><dd class="kpi-note">{{ totals.unindexed }} waiting for NexAI · {{ totals.nexai_7 }} NexAI requests this week</dd></div>
+  </dl>
+</section>
+
+<div class="dash-grid">
+  <section class="panel" aria-labelledby="pending-title">
+    <div class="panel-head"><h2 id="pending-title" class="section-title">Staff to verify</h2><a href="{% url 'platform:staff' %}">All</a></div>
+    {% include "platform/_pending.html" with pending=pending compact=True %}
+  </section>
+  <section class="panel" aria-labelledby="act-title">
+    <div class="panel-head"><h2 id="act-title" class="section-title">Latest activity</h2><a href="{% url 'platform:activity' %}">Everything</a></div>
+    {% include "platform/_activity.html" with items=activity %}
+  </section>
+</div>
+
+<section class="dash-section" style="margin-top:24px" aria-labelledby="depts-title">
+  <div class="panel-head"><h2 id="depts-title" class="section-title">Departments</h2><a href="{% url 'manage:departments' %}">Add a department</a></div>
+  <div class="table-wrap"><table class="data-table">
+    <thead><tr><th scope="col">Department</th><th scope="col">Members</th><th scope="col">Active 7d</th><th scope="col">Posts 30d</th><th scope="col">Open reports</th><th scope="col">Staff pending</th><th scope="col"></th></tr></thead>
+    <tbody>{% for d in departments %}<tr><td><b>{{ d.name }}</b><br><span class="small muted">{{ d.faculty.university.short_name }} · {{ d.faculty.name }}</span></td>
+      <td>{{ d.member_count }}</td><td>{{ d.active_count }}</td><td>{{ d.post_count }}</td><td>{{ d.open_reports }}</td><td>{{ d.pending_staff }}</td>
+      <td class="row-actions"><a href="{% url 'manage:overview' %}?dept={{ d.pk }}">Manage</a> <a href="{% url 'platform:activity' %}?dept={{ d.pk }}">Activity</a></td></tr>
+    {% empty %}<tr><td colspan="7" class="muted">No departments yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

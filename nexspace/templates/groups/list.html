@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% block title %}Study groups{% endblock %}
+{% block content %}
+<div class="page-head topic-head">
+  <div><h1>Study groups</h1><p>Small groups for revising together.</p></div>
+  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'groups:create' %}">New group</a>{% endif %}
+</div>
+<section class="stack"><h2 class="section-title">Your groups</h2>
+  {% if mine %}<ul class="group-list">{% for g in mine %}{% include "groups/_card.html" %}{% endfor %}</ul>
+  {% else %}<div class="empty empty-sm"><p>You're not in a study group yet. Join one below or start your own.</p></div>{% endif %}
+</section>
+<section class="stack" style="margin-top:28px"><h2 class="section-title">Open groups</h2>
+  {% if discover %}<ul class="group-list">{% for g in discover %}{% include "groups/_card.html" %}{% endfor %}</ul>
+  {% else %}<div class="empty empty-sm"><p>No open groups to join right now.</p></div>{% endif %}
+</section>
+{% endblock %}

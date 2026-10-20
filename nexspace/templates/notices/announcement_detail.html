@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% load nexspace %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'notices:announcements' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Announcements</a></div>
+<article class="announcement priority-{{ item.priority }} panel stack">
+  <p class="small muted">{% if item.priority != "normal" %}<span class="tag tag-{{ item.priority }}">{{ item.get_priority_display }}</span> {% endif %}For {{ item.audience_label }} · {{ item.created_at|date:"j M Y, H:i" }}{% if item.created_by %} · {{ item.created_by.full_name }}{% endif %}</p>
+  <h1 class="resource-h1">{{ item.title }}</h1>
+  <div class="post-body">{{ item.body|render_body }}</div>
+  {% if item.attachment %}<a class="btn btn-ghost" href="{% url 'notices:announcement-attachment' item.pk %}"><svg class="icon-sm"><use href="#i-file"/></svg>{{ item.attachment_name }}</a>{% endif %}
+  {% if item.is_expired %}<p class="small muted">This announcement expired on {{ item.expires_at|date:"j M Y" }}.</p>{% endif %}
+</article>
+{% endblock %}

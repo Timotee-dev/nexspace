@@ -1,0 +1,9 @@
+{% extends "layouts/auth.html" %}
+{% block title %}Link expired{% endblock %}
+{% block card %}
+<header>
+  <h1>This link has expired or isn't valid</h1>
+  <p>Verification links last 3 days and stop working if you change your email. Log in and request a new one from the banner at the top of any page.</p>
+</header>
+<a class="btn btn-primary btn-block" href="{% if user.is_authenticated %}{% url 'core:home' %}{% else %}{% url 'accounts:login' %}{% endif %}">{% if user.is_authenticated %}Go to NexSpace{% else %}Log in{% endif %}</a>
+{% endblock %}

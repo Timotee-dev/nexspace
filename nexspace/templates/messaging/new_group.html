@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+{% block title %}New group{% endblock %}
+{% block content %}
+<div class="back-row"><a class="btn btn-quiet" href="{% url 'messaging:inbox' %}"><svg class="icon-sm"><use href="#i-back"/></svg>Messages</a></div>
+<div class="page-head"><h1>New group</h1><p>A group chat for a study group, project team or class. Up to {{ max }} people from your department.</p></div>
+<form method="post" class="form panel stack">
+  {% csrf_token %}
+  {% if error %}<div class="form-errors" role="alert">{{ error }}</div>{% endif %}
+  <div class="field"><label for="g-title">Group name</label><input id="g-title" name="title" maxlength="80" required value="{{ title }}" placeholder="e.g. CSC 301 project team"></div>
+  {% include "messaging/_people_picker.html" %}
+  <div class="form-actions"><a class="btn btn-quiet" href="{% url 'messaging:inbox' %}">Cancel</a><button type="submit" class="btn btn-primary">Create group</button></div>
+</form>
+{% endblock %}

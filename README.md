@@ -124,6 +124,14 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Android app support (v0.11)
+
+- **NexSpace has an Android app** (separate `nexspace-app` folder, React Native / Expo). It uses the same accounts and data as the website.
+- The app's API lives under `/api/m/` (`apps/mobile`): sign in, sign up, 6-digit email code, password reset, feed extras (repost/quote/edit), courses and materials, Spaces, calendar, announcements, messages with files, profiles, reports and "signed-in phones".
+- **Phones sign in with a device key**, not a cookie. Only a scrambled (hashed) copy is stored. A key stops working when the person signs out, changes their password, or is suspended; "Signed-in phones" in the app can sign out a lost phone.
+- **Files open through short-lived links** (10 minutes) so the phone's viewer can open PDFs and photos without the app's key, and nobody can reuse an old link.
+- Nothing changes for the website. Render runs the new migration on the next deploy.
+
 ## Owner account from Render settings, 100 MB uploads with compression (v0.10.3)
 
 - **The admin account comes from Render's Environment settings**, like the Eunice Wears store: set `OWNER_EMAIL` and `OWNER_PASSWORD`, and add `&& python manage.py setup_owner` to the build command. On every deploy that account is created if missing, or repaired (reactivated, email marked verified, password reset to `OWNER_PASSWORD`), and made the only platform admin; every other admin account is stripped. The password lives only in Render, never in the code. Changing your password inside NexSpace lasts until the next deploy, so change it in Render instead.

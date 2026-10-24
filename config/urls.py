@@ -28,6 +28,7 @@ api_patterns = [
 urlpatterns = [
     path("admin/", RedirectView.as_view(url="/manage/", permanent=False)),  # people naturally type /admin
     path("django-admin/", admin.site.urls),
+    path("api/m/", include("apps.mobile.urls")),
     path("api/", include(api_patterns)),
     path("", include("apps.accounts.urls")),
     path("", include("apps.social.urls")),

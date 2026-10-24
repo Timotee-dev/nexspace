@@ -6,7 +6,8 @@ from .models import Comment, Post
 def public_author(user, request):
     avatar = user.profile.avatar
     return {
-        "display_name": user.full_name,
+        "badge": user.staff_badge,
+        "display_name": user.display_name,
         "username": user.username,
         "avatar_url": request.build_absolute_uri(avatar.url) if avatar else None,
         "level": user.level_label,
@@ -42,8 +43,44 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             "id", "kind", "title", "body", "author", "is_anonymous", "is_official", "topics", "score",
             "comment_count", "my_vote", "is_bookmarked", "is_mine", "accepted_comment_id", "created_at", "space",
-            "url", "attachments", "poll", "event", "opportunity",
+            "url", "attachments", "poll", "event", "opportunity", "edited_at", "repost_count", "space_name",
+            "reposted_by", "is_reposted", "quoted",
         ]
+
+    reposted_by = serializers.SerializerMethodField()
+    is_reposted = serializers.SerializerMethodField()
+    quoted = serializers.SerializerMethodField()
+
+    def get_reposted_by(self, obj) -> str | None:
+        who = getattr(obj, "reposted_by", None)
+        return who.display_name if who else None
+
+    def get_is_reposted(self, obj) -> bool:
+        if hasattr(obj, "is_reposted"):
+            return bool(obj.is_reposted)
+        from .services import reposted_ids
+
+        user = self.context["request"].user
+        return user.is_authenticated and bool(reposted_ids(user, [obj]))
+
+    def get_quoted(self, obj) -> dict | None:
+        """The post a quote-post is quoting (plain reposts are shown as the original instead)."""
+        original = obj.repost_of if obj.repost_of_id and obj.kind != Post.Kind.REPOST else None
+        if original is None:
+            return None
+        if original.is_deleted or original.is_hidden:
+            return {"id": None, "title": "", "body": "This post was removed.", "author": None}
+        from .services import can_view
+
+        if not can_view(self.context["request"].user, original):
+            return {"id": None, "title": "", "body": "This post isn't available to you.", "author": None}
+        return {"id": original.pk, "title": original.title, "body": original.body[:280],
+                "author": "Anonymous" if original.is_anonymous else original.author.display_name}
+
+    space_name = serializers.SerializerMethodField()
+
+    def get_space_name(self, obj) -> str | None:
+        return obj.space.name if obj.space_id else None
 
     def get_author(self, obj) -> dict:
         return ANONYMOUS_AUTHOR if obj.is_anonymous else public_author(obj.author, self.context["request"])
@@ -65,7 +102,14 @@ class PostSerializer(serializers.ModelSerializer):
     def get_attachments(self, obj) -> list:
         from django.urls import reverse
 
+        from apps.mobile.models import DeviceToken
+
         request = self.context["request"]
+        if isinstance(getattr(request, "auth", None), DeviceToken):  # the app gets short-lived signed links
+            from apps.mobile.api import signed_download
+
+            return [{"id": a.id, "kind": a.kind, "name": a.original_name, "size": a.size,
+                     "url": signed_download(request, "post-file", a.id)} for a in obj.attachments.all()]
         return [
             {"id": a.id, "kind": a.kind, "name": a.original_name, "size": a.size,
              "url": request.build_absolute_uri(reverse("posts:attachment", args=[obj.pk, a.pk]))}

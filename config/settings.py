@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "apps.manage",
     "apps.nexai",
     "apps.messaging",
+    "apps.mobile",
 ]
 
 MIDDLEWARE = [
@@ -199,7 +200,10 @@ LOGIN_LOCKOUT_SECONDS = 15 * 60
 
 # --- REST framework ------------------------------------------------------
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.mobile.authentication.DeviceTokenAuthentication",  # the Android app
+        "rest_framework.authentication.SessionAuthentication",   # the website
+    ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -216,7 +220,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.10.3",
+    "VERSION": "0.11.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",

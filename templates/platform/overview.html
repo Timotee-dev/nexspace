@@ -19,7 +19,7 @@
     <div class="kpi"><dt>Members</dt><dd>{{ totals.users }}</dd><dd class="kpi-note">{{ totals.new_7 }} joined this week</dd></div>
     <div class="kpi"><dt>Active this week</dt><dd>{{ totals.active_7 }}</dd><dd class="kpi-note">{{ totals.posts_7 }} posts · {{ totals.comments_7 }} comments</dd></div>
     <div class="kpi"><dt>Open reports</dt><dd>{{ totals.open_reports }}</dd><dd class="kpi-note">{{ totals.suspended }} suspended · {{ totals.banned }} banned</dd></div>
-    <div class="kpi"><dt>Resources</dt><dd>{{ totals.resources }}</dd><dd class="kpi-note">{{ totals.unindexed }} waiting for NexAI · {{ totals.nexai_7 }} NexAI requests this week</dd></div>
+    <div class="kpi"><dt>Resources</dt><dd>{{ totals.resources }}</dd><dd class="kpi-note">{{ totals.unindexed }} waiting for NexAI · {{ totals.nexai_7 }} NexAI requests this week</dd><dd class="kpi-note">{% if totals.ocr_on %}OCR: {{ totals.ocr_waiting }} photo/scan file{{ totals.ocr_waiting|pluralize }} waiting · {{ totals.ocr_today }} page{{ totals.ocr_today|pluralize }} read today{% else %}OCR off (add OCR_SPACE_API_KEY on Render){% endif %}</dd></div>
   </dl>
 </section>
 

@@ -190,7 +190,12 @@ def overview_view(request):
         "suspended": User.objects.filter(suspended_until__gt=now).count(),
         "push_pending": Notification.objects.filter(push_status="pending").count(),
         "unindexed": Resource.objects.filter(indexed_at__isnull=True, is_removed=False).count(),
+        "ocr_waiting": Resource.objects.filter(ocr_status="pending", is_removed=False).count(),
     }
+    from apps.nexai import ocr
+
+    totals["ocr_on"] = ocr.enabled()
+    totals["ocr_today"] = ocr.pages_used_today()
     departments = (Department.objects.select_related("faculty__university")
                    .annotate(member_count=Count("members", filter=Q(members__is_active=True), distinct=True),
                              active_count=Count("members", filter=Q(members__last_seen_at__gte=week), distinct=True),

@@ -63,9 +63,14 @@ def search(user, q, *, only=None, limit=5):
                                  .filter(_all_words(words, "name", "description", "course__code"))
                                  .order_by("-is_official", "-member_count")[:limit])
     if want("resources"):
+        from apps.nexai.models import ResourceChunk
+
+        in_text = Q()  # every word must appear in the details or somewhere in the file's text
+        for word, spaced in words:
+            ids = ResourceChunk.objects.filter(text__icontains=word).values("resource_id")
+            in_text &= _all_words([(word, spaced)], "title", "description", "course__code", "course__title") | Q(pk__in=ids)
         results["resources"] = list(Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
-                                    .filter(_all_words(words, "title", "description", "course__code", "course__title"))
-                                    .order_by("-download_count")[:limit])
+                                    .filter(in_text).order_by("-download_count")[:limit])
     base_posts = Post.objects.for_viewer(user).with_related().exclude(kind=Post.Kind.REPOST)
     if want("posts"):
         results["posts"] = list(base_posts.exclude(kind=Post.Kind.OPPORTUNITY)

@@ -220,7 +220,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.11.0",
+    "VERSION": "0.12.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -272,6 +272,19 @@ NEXAI_ENABLED = bool(ANTHROPIC_API_KEY)
 
 # Secret for /internal/run-scheduled/ (free alternative to a paid Render cron job).
 CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+
+# OCR: reads photos and scanned PDF pages of course materials with the free OCR.space service
+# (apps/nexai/ocr.py). Off until OCR_SPACE_API_KEY is set. Free plan: about 25,000 pages a month,
+# 500 a day, 1 MB per file; pages are sent one at a time as small JPEGs to fit.
+OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY", "").strip()
+OCR_SPACE_ENGINE = int(os.environ.get("OCR_SPACE_ENGINE", "2"))       # 2 = better on photos; 1 = more languages
+OCR_SPACE_LANGUAGE = os.environ.get("OCR_SPACE_LANGUAGE", "eng")
+OCR_DAILY_PAGE_LIMIT = int(os.environ.get("OCR_DAILY_PAGE_LIMIT", "400"))  # stays under the free 500/day
+OCR_MAX_PAGES_PER_FILE = int(os.environ.get("OCR_MAX_PAGES_PER_FILE", "60"))
+OCR_TIME_BUDGET = int(os.environ.get("OCR_TIME_BUDGET", "20"))  # seconds per scheduled run (free schedulers time out at ~30s)
+OCR_REQUEST_TIMEOUT = int(os.environ.get("OCR_REQUEST_TIMEOUT", "25"))
+OCR_MAX_EDGE = 2200                                                    # longest side of a page image, in pixels
+RESOURCE_IMAGE_MAX_EDGE = 2400                                         # photos of notes keep enough detail to read
 
 # --- Platform ownership ------------------------------------------------------
 # These accounts are always platform (super) admins once their email is verified. They can't be

@@ -6,6 +6,7 @@ or the protected /internal/run-scheduled/ URL (free schedulers such as cron-job.
 - Study group meeting reminders (the day before)
 - Trending recalculation for every department
 - NexAI indexing of new resources
+- OCR of photos and scanned pages (OCR.space, within a time budget and a daily page limit)
 - Push notification delivery
 - Housekeeping: delete read notifications older than 90 days
 
@@ -81,6 +82,22 @@ def run_all():
 
     indexed = index_pending()
 
+    # 5b. OCR: read photos and scanned pages with OCR.space, a few at a time (free-plan friendly)
+    from django.core.cache import cache as _cache
+
+    from apps.nexai import ocr
+    from apps.nexai.indexing import queue_unread_scans
+
+    try:
+        if ocr.enabled() and _cache.add("ocr-backfill-done", 1, None):
+            queue_unread_scans()  # once, after the key is first added: older photos/scans get read too
+        ocr_result = ocr.process_pending()
+    except Exception:  # OCR must never stop reminders, push or digests
+        import logging
+
+        logging.getLogger(__name__).exception("OCR step failed")
+        ocr_result = {"pages": 0}
+
     # 6. Push delivery
     push = notifications.send_pending_push()
 
@@ -90,7 +107,7 @@ def run_all():
     from apps.notifications.digest import send_due_digests
 
     digests = send_due_digests(now)
-    result = {**counts, "indexed": indexed, "push": push, "cleaned": deleted, "digests": digests}
+    result = {**counts, "indexed": indexed, "ocr_pages": ocr_result["pages"], "push": push, "cleaned": deleted, "digests": digests}
     from django.core.cache import cache
 
     cache.set("last-scheduled-run", {"at": now.isoformat(), "result": result}, None)

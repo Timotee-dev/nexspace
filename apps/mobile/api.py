@@ -288,7 +288,7 @@ def resource_json(request, r):
             "course": r.course.code, "name": r.original_name, "size": r.size, "downloads": r.download_count,
             "rating": round(r.rating_sum / r.rating_count, 1) if r.rating_count else None,
             "verified": r.is_verified_upload, "created_at": r.created_at,
-            "download_url": signed_download(request, "resource", r.id)}
+            "text_status": r.ocr_status, "download_url": signed_download(request, "resource", r.id)}
 
 
 class CoursesAPIView(APIView):

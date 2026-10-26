@@ -9,6 +9,8 @@ from apps.posts.services import RateLimited, _limit, require_verified  # noqa: F
 from apps.reputation import rules
 from apps.reputation import services as nexscore
 
+from apps.nexai.models import ResourceChunk
+
 from .models import Resource, ResourceDownload, ResourceRating
 
 UPLOAD_RATE = (20, 60 * 60)
@@ -46,7 +48,7 @@ def upload(*, user, course, title, file, resource_type, description="", exam_typ
         exam_type = ""
     if file is None:
         raise ValidationError("Choose a file to upload.")
-    file, content_type = prepare_document(file)  # checked, compressed if big, fits storage
+    file, content_type = prepare_document(file, allow_images=True)  # checked, compressed if big, fits storage
     resource = Resource.objects.create(
         course=course, title=title[:150], description=(description or "")[:1000], resource_type=resource_type,
         exam_type=exam_type or "", session=session, semester=semester or course.semester,
@@ -136,9 +138,11 @@ def rate(*, user, resource, stars, review=""):
 def search(queryset, *, q="", course=None, level=None, session=None, semester=None, resource_type=None, sort="useful"):
     if q:
         for word in q.split()[:6]:
+            matching_text = ResourceChunk.objects.filter(text__icontains=word).values("resource_id")
             queryset = queryset.filter(
                 Q(title__icontains=word) | Q(description__icontains=word) | Q(course__code__icontains=word)
                 | Q(course__title__icontains=word) | Q(course__code__icontains=f"{word[:3]} {word[3:]}")
+                | Q(pk__in=matching_text)  # words inside the file itself, including text read from scans
             )
     if course:
         queryset = queryset.filter(course__slug=course)

@@ -124,6 +124,17 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Reading text in photos and scans — OCR (v0.12)
+
+- **Course materials can now be photos** (JPG, PNG, WebP) as well as PDF, Word and PowerPoint. Photos keep enough detail (2400 px) for their text to be read.
+- **Text in photos and scanned PDF pages is read automatically** by the free **OCR.space** service, so those files show up in search (library and the main search box) and work with NexAI (Ask, Summarise, Quiz me). Search now also looks at the words *inside* every readable file, not just titles.
+- **Turn it on:** get a free key at https://ocr.space/ocrapi (just an email), then add `OCR_SPACE_API_KEY` in Render → Environment. Without the key nothing changes and nothing is sent anywhere.
+- **How it stays free and safe:** PDFs that already contain real text never use OCR. Only pages with no real text are sent, one page at a time as a small grey JPEG (always under the free plan's 1 MB limit, so long scanned PDFs work despite the free 3-page PDF limit). Reading happens in the background during the scheduled run (every 15 minutes), up to 20 seconds per run and `OCR_DAILY_PAGE_LIMIT` pages a day (400, under the free 500/day). Uploading never waits for it.
+- **What people see:** "Reading text…" on the file while it's being read, then "Text found". If OCR.space is down or the day's limit is reached, files just wait for the next run; after many failed tries a file is given up on, and it still downloads normally.
+- **Older uploads:** the first scheduled run after you add the key queues photos and scans that were uploaded before, so they get read too.
+- Admin → Platform overview shows how many files are waiting and pages read today.
+- OCR reads printed and typed text well. Messy handwriting is hit-and-miss.
+
 ## Android app support (v0.11)
 
 - **NexSpace has an Android app** (separate `nexspace-app` folder, React Native / Expo). It uses the same accounts and data as the website.

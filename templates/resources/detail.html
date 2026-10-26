@@ -18,7 +18,11 @@
     <div class="stat"><b>{{ resource.download_count }}</b><span>download{{ resource.download_count|pluralize }}</span></div>
     <div class="stat"><b>{{ resource.size|filesize }}</b><span>{{ resource.extension }} file</span></div>
   </div>
-  {% if resource.index_error %}<p class="small muted">NexAI: {{ resource.index_error }}</p>{% endif %}
+  {% if resource.ocr_status == "pending" %}
+  <p class="small muted"><span class="tag">Reading text…</span> This is a photo or scan. Its text is being read so people can search it and NexAI can use it ({{ resource.ocr_pages_done }} of {{ resource.ocr_page_count }} page{{ resource.ocr_page_count|pluralize }} done).</p>
+  {% elif resource.ocr_status == "done" and not resource.index_error %}
+  <p class="small muted"><span class="tag tag-official">Text found</span> Text was read from the scanned pages, so this file shows up in search and works with NexAI.</p>
+  {% elif resource.index_error %}<p class="small muted">NexAI: {{ resource.index_error }}</p>{% endif %}
   <p class="small muted">Uploaded by {% if resource.uploaded_by %}<a href="{% url 'accounts:profile' resource.uploaded_by.username %}">{{ resource.uploaded_by.full_name }}</a>{% else %}a former member{% endif %}{% if resource.is_verified_upload %} <span class="tag tag-official">{% if resource.uploaded_by.staff_badge %}{{ resource.uploaded_by.staff_badge }}{% else %}Course rep{% endif %}</span>{% endif %} · {{ resource.created_at|date:"j M Y" }}</p>
   <div class="form-actions" style="justify-content:flex-start">
     <a class="btn btn-primary" href="{% url 'resources:download' resource.pk %}">Download</a>

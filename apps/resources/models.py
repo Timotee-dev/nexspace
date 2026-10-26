@@ -56,6 +56,19 @@ class Resource(models.Model):
     indexed_at = models.DateTimeField(null=True, blank=True)
     index_error = models.CharField(max_length=200, blank=True)
 
+    class OcrStatus(models.TextChoices):
+        NONE = "", "Not needed"
+        PENDING = "pending", "Reading scanned pages"
+        DONE = "done", "Text read from scans"
+        FAILED = "failed", "Couldn't read scans"
+
+    # Photos and scanned PDF pages are read by OCR.space in the background (apps/nexai/ocr.py).
+    ocr_status = models.CharField(max_length=8, choices=OcrStatus.choices, blank=True, default="", db_index=True)
+    ocr_pages_waiting = models.JSONField(default=list, blank=True, help_text="Page numbers still to be read")
+    ocr_page_count = models.PositiveIntegerField(default=0, help_text="Pages sent for reading in total")
+    ocr_retries = models.PositiveSmallIntegerField(default=0)
+    ocr_error = models.CharField(max_length=200, blank=True)
+
     objects = ResourceQuerySet.as_manager()
 
     class Meta:
@@ -70,6 +83,10 @@ class Resource(models.Model):
 
     def get_absolute_url(self):
         return reverse("resources:detail", args=[self.pk])
+
+    @property
+    def ocr_pages_done(self):
+        return max(0, self.ocr_page_count - len(self.ocr_pages_waiting or []))
 
     @property
     def rating_avg(self):

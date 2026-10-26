@@ -16,16 +16,17 @@ class ResourceUploadForm(forms.Form):
     semester = forms.TypedChoiceField(choices=[("", "Course default"), *Semester.choices], coerce=int,
                                       required=False, empty_value=None)
     description = forms.CharField(max_length=1000, required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    file = forms.FileField(help_text="PDF, Word or PowerPoint")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from django.conf import settings
-
-        self.fields["file"].help_text = f"PDF, Word or PowerPoint, up to {settings.MAX_DOCUMENT_MB} MB"
+    file = forms.FileField(help_text="PDF, Word, PowerPoint, or a photo")
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.conf import settings
+
+        help_text = f"PDF, Word, PowerPoint, or a photo (JPG, PNG), up to {settings.MAX_DOCUMENT_MB} MB."
+        if settings.OCR_SPACE_API_KEY:
+            help_text += " Text in photos and scanned pages is read automatically, so people can search it."
+        self.fields["file"].help_text = help_text
+        self.fields["file"].widget.attrs["accept"] = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
         self.fields["course"].queryset = Course.objects.filter(department_id=user.department_id, is_active=True)
         uni = user.department.faculty.university_id if user.department_id else None
         self.fields["session"].queryset = AcademicSession.objects.filter(university_id=uni)

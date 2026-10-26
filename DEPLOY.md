@@ -30,7 +30,7 @@ NexSpace sends over Brevo's HTTPS API, not SMTP (Render blocks SMTP ports). You 
 
 Brevo's free plan rewrites every link in an email into a tracking link, and that redirect can hang on some phones. NexSpace works around it: verification emails include a 6-digit code (users tap **Enter code** on the banner), and links are also printed as plain text, which Brevo leaves alone.
 
-## 4. Files — Supabase Storage (recommended) or Cloudinary
+## 4. Files — Cloudinary (what NexSpace uses) or Supabase Storage
 
 **Supabase Storage** (same Supabase project as your database): files up to 50 MB each, 1 GB total on the free plan, kept in a *private* bucket — every download is a signed link that expires after an hour.
 
@@ -92,6 +92,14 @@ Render cron jobs cost at least $1/month. Instead, let a free scheduler call NexS
 3. If you use this, delete the `- type: cron` block from `render.yaml` (or don't create the cron job).
 
 This sends exam and deadline reminders, the weekly summary emails, delivers push notifications, reads new uploads for NexAI and recomputes trending. The URL returns "not found" to anyone without the secret. On the free plan the first call after a quiet period may time out while the server wakes up; the next one works.
+
+## 5d. Reading photos and scans — OCR (free)
+
+1. Go to **https://ocr.space/ocrapi** → *Register for free API key*, enter your email. The key arrives by email.
+2. Render → web service → **Environment** → add `OCR_SPACE_API_KEY` = that key → Save (Render redeploys).
+3. OCR runs inside the scheduled job, so **section 5b (cron-job.org) must be set up** — without it, nothing gets read.
+
+Optional: `OCR_DAILY_PAGE_LIMIT` (default 400 pages a day; OCR.space's free plan allows 500 a day and about 25,000 a month).
 
 ## 5c. Your admin account (OWNER_EMAIL / OWNER_PASSWORD)
 

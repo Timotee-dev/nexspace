@@ -114,8 +114,8 @@ def announcement_upload_path(instance, filename):
     return f"announcements/{uuid.uuid4().hex}{ext}"
 
 
-def optimize_image(file):
-    """Resize to IMAGE_MAX_EDGE, fix orientation and strip all metadata (EXIF/GPS).
+def optimize_image(file, max_edge=None):
+    """Resize to IMAGE_MAX_EDGE (or max_edge), fix orientation and strip all metadata (EXIF/GPS).
 
     Returns a new in-memory file with the same name, or the original on failure.
     """
@@ -129,7 +129,8 @@ def optimize_image(file):
         with Image.open(file) as image:
             fmt = image.format
             image = ImageOps.exif_transpose(image)
-            image.thumbnail((settings.IMAGE_MAX_EDGE, settings.IMAGE_MAX_EDGE))
+            edge = max_edge or settings.IMAGE_MAX_EDGE
+            image.thumbnail((edge, edge))
             if fmt == "JPEG" and image.mode not in ("RGB", "L"):
                 image = image.convert("RGB")
             buffer = BytesIO()
@@ -267,8 +268,19 @@ def check_storage_limit(file):
         )
 
 
-def prepare_document(file):
-    """Validate, compress if big, and check it fits storage. Returns (file, content_type)."""
+RESOURCE_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def prepare_document(file, allow_images=False):
+    """Validate, compress if big, and check it fits storage. Returns (file, content_type).
+
+    With allow_images (course materials), photos of notes and past questions are accepted too; they're
+    resized less than post photos so their text stays readable."""
+    if allow_images and os.path.splitext(file.name)[1].lower() in RESOURCE_IMAGE_EXTENSIONS:
+        content_type = image_content_type(file)
+        file = optimize_image(file, max_edge=settings.RESOURCE_IMAGE_MAX_EDGE)
+        check_storage_limit(file)
+        return file, content_type
     content_type = validate_document_upload(file)
     file = compress_document(file, content_type)
     check_storage_limit(file)

@@ -37,6 +37,8 @@ services:
         sync: false
       - key: OWNER_PASSWORD
         sync: false
+      - key: OCR_SPACE_API_KEY
+        sync: false
   - type: cron
     name: nexspace-scheduled
     runtime: python

@@ -35,6 +35,7 @@ def ocr_on(settings):
     settings.OCR_SPACE_API_KEY = "test-key"
     settings.OCR_DAILY_PAGE_LIMIT = 400
     settings.OCR_TIME_BUDGET = 30
+    settings.OCR_SPACE_ENGINE = 2  # most tests check one engine; the auto mode has its own tests below
     return settings
 
 
@@ -245,3 +246,50 @@ def test_fake_images_are_still_rejected(ocr_on, uploader, course):
     with pytest.raises(ValidationError):
         resources.upload(user=uploader, course=course, title="x", resource_type="lecture_note",
                          file=SimpleUploadedFile("evil.jpg", b"<script>alert(1)</script>"))
+
+
+class PerEngine(FakeOcrSpace):
+    """Answers differently per engine: Engine 2 misses handwriting, Engine 3 reads it."""
+
+    def __init__(self, by_engine):
+        super().__init__()
+        self.by_engine = by_engine
+
+    def __call__(self, request, timeout=None):
+        from urllib.parse import parse_qs
+
+        engine = parse_qs(request.data.decode())["OCREngine"][0]
+        self.sent.append(engine)
+        body = {"ParsedResults": [{"ParsedText": self.by_engine[engine], "FileParseExitCode": 1}],
+                "OCRExitCode": 1, "IsErroredOnProcessing": False}
+        return io.BytesIO(json.dumps(body).encode())
+
+
+def test_auto_engine_tries_handwriting_engine_only_when_needed(ocr_on, monkeypatch, uploader, course):
+    ocr_on.OCR_SPACE_ENGINE = "auto"
+    handwriting = "Handwritten: define recursion and give the base case for factorial."
+    api = PerEngine({"2": "Hn", "3": handwriting})
+    monkeypatch.setattr(ocr.urllib.request, "urlopen", api)
+    r = upload(uploader, course, photo())
+    ocr.process_pending()
+    r.refresh_from_db()
+    assert api.sent == ["2", "3"] and handwriting in r.chunks.first().text
+    assert ocr.pages_used_today() == 2 and ocr.engine3_left_this_month() == ocr_on.OCR_ENGINE3_MONTHLY_LIMIT - 1
+
+    printed = "Printed: a stack is last in, first out; a queue is first in, first out."
+    api2 = PerEngine({"2": printed, "3": "should not be used"})
+    monkeypatch.setattr(ocr.urllib.request, "urlopen", api2)
+    r2 = upload(uploader, course, photo(), title="Typed notes")
+    ocr.process_pending()
+    assert api2.sent == ["2"]  # Engine 2 was enough, the small Engine 3 allowance is saved
+
+
+def test_engine3_allowance_runs_out_gracefully(ocr_on, monkeypatch, uploader, course):
+    ocr_on.OCR_SPACE_ENGINE = "auto"
+    ocr_on.OCR_ENGINE3_MONTHLY_LIMIT = 0
+    api = PerEngine({"2": "", "3": "never"})
+    monkeypatch.setattr(ocr.urllib.request, "urlopen", api)
+    r = upload(uploader, course, photo())
+    ocr.process_pending()
+    r.refresh_from_db()
+    assert api.sent == ["2"] and r.ocr_status == "done"

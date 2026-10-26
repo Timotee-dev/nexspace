@@ -64,6 +64,41 @@ def pages_left_today() -> int:
     return max(0, settings.OCR_DAILY_PAGE_LIMIT - pages_used_today())
 
 
+def _month_key():
+    return f"ocr-engine3:{timezone.localdate():%Y%m}"
+
+
+def engine3_left_this_month() -> int:
+    return max(0, settings.OCR_ENGINE3_MONTHLY_LIMIT - cache.get(_month_key(), 0))
+
+
+def _count_engine3():
+    key = _month_key()
+    if not cache.add(key, 1, 60 * 60 * 24 * 32):
+        try:
+            cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, 60 * 60 * 24 * 32)
+
+
+def read_page(jpeg: bytes) -> str:
+    """Engine 2 first (big free allowance). If it finds almost nothing — usually handwriting — try
+    Engine 3, which reads handwriting but has a small separate allowance (1,000 a month free)."""
+    if settings.OCR_SPACE_ENGINE != "auto":
+        return read_jpeg(jpeg)
+    text = read_jpeg(jpeg, engine=2)
+    if len(text.strip()) >= MIN_TEXT_CHARS or engine3_left_this_month() <= 0 or pages_left_today() <= 1:
+        return text
+    _count_page()  # Engine 3 is another request against the daily limit
+    try:
+        better = read_jpeg(jpeg, engine=3)
+    except OcrError:
+        return text  # keep what Engine 2 found; never stall a file on the extra try
+    finally:
+        _count_engine3()
+    return better if len(better.strip()) > len(text.strip()) else text
+
+
 def _count_page():
     key = _day_key()
     if not cache.add(key, 1, 60 * 60 * 26):
@@ -126,14 +161,15 @@ def pdf_page(pdf_bytes: bytes, page_number: int) -> bytes:
 
 
 # --- Talking to OCR.space ---------------------------------------------------------------
-def read_jpeg(jpeg: bytes) -> str:
+def read_jpeg(jpeg: bytes, engine=None) -> str:
     """Send one page to OCR.space and return the text it found (may be empty)."""
+    engine = engine or (2 if settings.OCR_SPACE_ENGINE == "auto" else settings.OCR_SPACE_ENGINE)
     if len(jpeg) > FREE_LIMIT_BYTES:
         raise OcrError("This page is too large to read.", retry=False)
     data = urllib.parse.urlencode({
         "base64Image": "data:image/jpeg;base64," + base64.b64encode(jpeg).decode(),
         "language": settings.OCR_SPACE_LANGUAGE,
-        "OCREngine": str(settings.OCR_SPACE_ENGINE),
+        "OCREngine": str(engine),
         "scale": "true",
         "detectOrientation": "true",
         "isOverlayRequired": "false",
@@ -201,7 +237,7 @@ def process_pending(time_budget=None) -> dict:
             page = waiting[0]
             try:
                 jpeg = image_page(BytesIO(raw)) if is_image(resource.original_name) else pdf_page(raw, page)
-                text = read_jpeg(jpeg)
+                text = read_page(jpeg)
             except OcrError as exc:
                 if exc.retry:
                     logger.info("OCR paused for resource %s: %s", resource.pk, exc)

@@ -133,7 +133,7 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **What people see:** "Reading text…" on the file while it's being read, then "Text found". If OCR.space is down or the day's limit is reached, files just wait for the next run; after many failed tries a file is given up on, and it still downloads normally.
 - **Older uploads:** the first scheduled run after you add the key queues photos and scans that were uploaded before, so they get read too.
 - Admin → Platform overview shows how many files are waiting and pages read today.
-- OCR reads printed and typed text well. Messy handwriting is hit-and-miss.
+- **Two OCR engines, chosen automatically:** Engine 2 reads every page (25,000 free a month). Only when it finds almost nothing — usually handwriting — the page is tried again with Engine 3, which reads handwriting and tables but has a separate, smaller free allowance (1,000 a month; NexSpace stops at `OCR_ENGINE3_MONTHLY_LIMIT`, 900). Force one engine with `OCR_SPACE_ENGINE=2` or `3`. Language is auto-detected.
 
 ## Android app support (v0.11)
 

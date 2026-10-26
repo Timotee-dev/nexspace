@@ -220,7 +220,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.12.0",
+    "VERSION": "0.12.1",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -277,8 +277,12 @@ CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
 # (apps/nexai/ocr.py). Off until OCR_SPACE_API_KEY is set. Free plan: about 25,000 pages a month,
 # 500 a day, 1 MB per file; pages are sent one at a time as small JPEGs to fit.
 OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY", "").strip()
-OCR_SPACE_ENGINE = int(os.environ.get("OCR_SPACE_ENGINE", "2"))       # 2 = better on photos; 1 = more languages
-OCR_SPACE_LANGUAGE = os.environ.get("OCR_SPACE_LANGUAGE", "eng")
+# "auto" = Engine 2 for everything, Engine 3 (handwriting) only when Engine 2 finds almost nothing.
+# Or force one engine with 2 or 3. Free plan: 25,000 Engine 2 + 1,000 Engine 3 conversions a month.
+_engine = os.environ.get("OCR_SPACE_ENGINE", "auto").strip().lower()
+OCR_SPACE_ENGINE = _engine if _engine == "auto" else int(_engine)
+OCR_ENGINE3_MONTHLY_LIMIT = int(os.environ.get("OCR_ENGINE3_MONTHLY_LIMIT", "900"))  # under the free 1,000
+OCR_SPACE_LANGUAGE = os.environ.get("OCR_SPACE_LANGUAGE", "auto")  # OCR.space: keep "auto" for engines 2 and 3
 OCR_DAILY_PAGE_LIMIT = int(os.environ.get("OCR_DAILY_PAGE_LIMIT", "400"))  # stays under the free 500/day
 OCR_MAX_PAGES_PER_FILE = int(os.environ.get("OCR_MAX_PAGES_PER_FILE", "60"))
 OCR_TIME_BUDGET = int(os.environ.get("OCR_TIME_BUDGET", "20"))  # seconds per scheduled run (free schedulers time out at ~30s)

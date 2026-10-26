@@ -99,7 +99,7 @@ This sends exam and deadline reminders, the weekly summary emails, delivers push
 2. Render → web service → **Environment** → add `OCR_SPACE_API_KEY` = that key → Save (Render redeploys).
 3. OCR runs inside the scheduled job, so **section 5b (cron-job.org) must be set up** — without it, nothing gets read.
 
-Optional: `OCR_DAILY_PAGE_LIMIT` (default 400 pages a day; OCR.space's free plan allows 500 a day and about 25,000 a month).
+Optional: `OCR_DAILY_PAGE_LIMIT` (default 400 pages a day; OCR.space's free plan allows 500 a day and 25,000 a month). Leave `OCR_SPACE_ENGINE` unset: NexSpace uses Engine 2, and Engine 3 (handwriting, 1,000 free a month) only for pages Engine 2 can't read.
 
 ## 5c. Your admin account (OWNER_EMAIL / OWNER_PASSWORD)
 

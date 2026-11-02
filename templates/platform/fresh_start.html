@@ -1,0 +1,25 @@
+{% extends "layouts/app.html" %}
+{% block title %}Fresh start · Platform{% endblock %}
+{% block shell_class %}shell-wide{% endblock %}
+{% block content %}
+{% include "platform/_nav.html" %}
+<section class="panel stack" aria-labelledby="fs-title">
+  <h2 id="fs-title" class="section-title">Fresh start before launch</h2>
+  <p>This deletes every account except yours, and everything people have created, so you can start testing again from a clean NexSpace. <strong>It can't be undone.</strong></p>
+  <div class="table-wrap"><table class="data-table">
+    <thead><tr><th scope="col">Will be deleted</th><th scope="col">How many</th></tr></thead>
+    <tbody>{% for label, n in rows %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}
+    <tr><td>Also: votes, bookmarks, follows, notifications, reports, moderation history, NexScore history and uploaded files</td><td>all</td></tr></tbody>
+  </table></div>
+  <p class="small muted"><strong>Kept:</strong> your admin account, your department, courses, academic sessions, topics, and the official department, level and course Spaces.</p>
+  {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="form" data-confirm="Delete all test data now? This can't be undone.">
+    {% csrf_token %}
+    <div class="field"><label for="fs-confirm">Type <code>{{ phrase }}</code> to confirm</label>
+      <input id="fs-confirm" name="confirm" autocomplete="off" required></div>
+    <div class="field"><label for="fs-password">Your password</label>
+      <input id="fs-password" name="password" type="password" autocomplete="current-password" required></div>
+    <div class="form-actions" style="justify-content:flex-start"><button type="submit" class="btn btn-danger">Delete all test data</button></div>
+  </form>
+</section>
+{% endblock %}

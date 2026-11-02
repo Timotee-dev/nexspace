@@ -331,3 +331,30 @@ def database_view(request):
                        "count": model.objects.count(), "url": url})
     tables.sort(key=lambda t: (t["app"], t["name"]))
     return _render(request, "platform/database.html", {"tables": tables}, "database")
+
+
+@platform_required
+def fresh_start_view(request):
+    """Owner only: delete every test account and all activity before launch (keeps the setup)."""
+    from django.contrib.auth import authenticate
+
+    from apps.core import fresh_start
+
+    if not request.user.is_owner:
+        raise PermissionDenied
+    error = None
+    if request.method == "POST":
+        phrase_ok = request.POST.get("confirm", "").strip() == fresh_start.CONFIRM_PHRASE
+        password_ok = authenticate(request, email=request.user.email, password=request.POST.get("password", "")) is not None
+        if not phrase_ok:
+            error = f'Type {fresh_start.CONFIRM_PHRASE} exactly to confirm.'
+        elif not password_ok:
+            error = "That password isn't right. Nothing was deleted."
+        else:
+            done = fresh_start.fresh_start(request.user)
+            summary = ", ".join(f"{n} {label.split(' (')[0].lower()}" for label, n in done.items() if n)
+            messages.success(request, f"Fresh start done. Deleted: {summary or 'nothing (it was already empty)'}.")
+            return redirect("platform:overview")
+    return _render(request, "platform/fresh_start.html", {
+        "rows": fresh_start.preview(request.user), "phrase": fresh_start.CONFIRM_PHRASE, "error": error,
+    }, "fresh-start")

@@ -9,4 +9,5 @@
   <a href="{% url 'platform:activity' %}" {% if section == "activity" %}aria-current="page"{% endif %}>Activity</a>
   <a href="{% url 'platform:audit' %}" {% if section == "audit" %}aria-current="page"{% endif %}>Audit log</a>
   <a href="{% url 'platform:database' %}" {% if section == "database" %}aria-current="page"{% endif %}>Database</a>
+  {% if user.is_owner %}<a href="{% url 'platform:fresh-start' %}" {% if section == "fresh-start" %}aria-current="page"{% endif %}>Fresh start</a>{% endif %}
 </nav>

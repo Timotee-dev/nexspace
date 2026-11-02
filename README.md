@@ -124,6 +124,10 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Fresh start before launch (v0.13.1)
+
+Admin → Platform → **Fresh start** (platform owner only) deletes every account except yours and everything people created — posts, comments, polls, chats and messages, course materials, announcements, calendar events, study groups, community Spaces, reports, notifications, NexScore history — and the uploaded files. It keeps your account, departments, courses, sessions, topics and the official department/level/course Spaces. You type `DELETE ALL TEST DATA` and your password; it can't be undone and is written to the audit log. (Locally: `python manage.py fresh_start --owner you@example.com --yes`.)
+
 ## Security audit (v0.13)
 
 A full security review of the website and the app's API. Everything below has a test that tries the attack (`tests/test_security.py`), plus a sweep that opens every page with junk input (`tests/test_fuzz_all_pages.py`).

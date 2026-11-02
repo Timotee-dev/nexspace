@@ -13,4 +13,5 @@ urlpatterns = [
     path("platform/staff/<int:pk>/", views.staff_decision_view, name="staff-decision"),
     path("platform/audit/", views.audit_view, name="audit"),
     path("platform/database/", views.database_view, name="database"),
+    path("platform/fresh-start/", views.fresh_start_view, name="fresh-start"),
 ]

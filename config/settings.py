@@ -150,7 +150,21 @@ SUPABASE_S3_SECRET_ACCESS_KEY = os.environ.get("SUPABASE_S3_SECRET_ACCESS_KEY", 
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "nexspace").strip()
 SUPABASE_STORAGE = all([SUPABASE_S3_ENDPOINT, SUPABASE_S3_REGION, SUPABASE_S3_ACCESS_KEY_ID,
                         SUPABASE_S3_SECRET_ACCESS_KEY])
-CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL", "").strip()
+def _clean_cloudinary_url(raw: str) -> str:
+    """Forgive the usual copy-paste slips on Render: spaces, quotes, or "CLOUDINARY_URL=" pasted into the value.
+    The Cloudinary library reads the environment directly, so the cleaned value is written back."""
+    value = (raw or "").strip().strip("'\"").strip()
+    if value.upper().startswith("CLOUDINARY_URL="):
+        value = value.split("=", 1)[1].strip().strip("'\"").strip()
+    if value and not value.startswith("cloudinary://"):
+        raise RuntimeError("CLOUDINARY_URL must look like cloudinary://API_KEY:API_SECRET@CLOUD_NAME "
+                           "(copy the 'API environment variable' from the Cloudinary dashboard).")
+    if value:
+        os.environ["CLOUDINARY_URL"] = value
+    return value
+
+
+CLOUDINARY_URL = _clean_cloudinary_url(os.environ.get("CLOUDINARY_URL", ""))
 if SUPABASE_STORAGE:
     FILE_STORAGE_NAME = "Supabase Storage"
     _default_storage = "apps.core.storage.SupabaseStorage"
@@ -224,7 +238,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.13.1",
+    "VERSION": "0.13.2",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",

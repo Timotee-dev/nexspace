@@ -30,7 +30,10 @@
   {% for key, label in tabs %}<a href="?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}{% if key == "requests" and request_count %} <span class="tab-count">{{ request_count }}</span>{% endif %}</a>{% endfor %}
 </nav>
 
-{% if not can_see %}
+{% if not can_see and course %}
+<p class="notice small" role="note">{% if pending_request %}Your request to join is waiting for the {{ course.level }} Level course reps or an admin. You'll be notified when they decide.{% else %}Materials and past questions are open to everyone. Join this course to take part in its discussions{% if space|needs_approval:user %}; the {{ course.level }} Level course reps or an admin approve requests{% endif %}.{% endif %}</p>
+{% endif %}
+{% if not can_see and not course %}
 <section class="empty">
   <p style="font-size:2rem" aria-hidden="true">🔒</p>
   <h2>This Space is private</h2>
@@ -86,13 +89,13 @@
     {% if tab == "past-questions" and resources and nexai_enabled %}
     <form method="post" action="{% url 'nexai:insights' course.slug %}">{% csrf_token %}<button class="btn btn-ghost btn-sm"><span aria-hidden="true">✦</span> What comes up most?</button></form>
     {% endif %}
-    {% if user.can_write %}<a class="btn btn-primary btn-sm" href="{% url 'resources:upload' %}?course={{ course.slug }}{% if tab == 'past-questions' %}&type=past_question{% endif %}">Upload</a>{% endif %}
+    {% if is_rep and user.can_write %}<a class="btn btn-primary btn-sm" href="{% url 'resources:upload' %}?course={{ course.slug }}{% if tab == 'past-questions' %}&type=past_question{% endif %}">Upload</a>{% endif %}
   </div>
   {% if resources %}
   <ul class="resource-list">{% for resource in resources %}{% include "partials/resource_row.html" %}{% endfor %}</ul>
   {% else %}
   <div class="empty"><h2>{% if tab == "past-questions" %}No past questions yet{% else %}No resources have been uploaded yet{% endif %}</h2>
-    <p>{% if is_rep %}As course rep, your uploads publish immediately with a Course rep badge.{% else %}Have notes or past questions? Share them with your classmates.{% endif %}</p></div>
+    <p>{% if is_rep %}You can upload materials for this course. They publish immediately with a badge.{% else %}Materials are uploaded by the {{ course.level }} Level course reps, the lecturer and admins. Have something useful? Send it to your course rep.{% endif %}</p></div>
   {% endif %}
 
 {% elif tab == "members" or tab == "people" %}

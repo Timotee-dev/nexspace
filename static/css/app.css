@@ -1022,6 +1022,9 @@ dl.stat-row { margin: 0; }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .data-table th, .data-table td { padding: 10px var(--s3); text-align: left; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
 .data-table thead th { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; background: var(--surface); white-space: nowrap; }
+.data-table-courses { min-width: 640px; }
+.data-table-courses td:nth-child(2) { min-width: 180px; }
+.data-table .row-actions { white-space: nowrap; }
 .data-table tr:last-child td { border-bottom: 0; }
 .panel .data-table th, .panel .data-table td { padding-left: 0; }
 .row-actions { display: flex; gap: var(--s3); align-items: center; }

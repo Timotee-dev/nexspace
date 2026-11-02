@@ -1,17 +1,19 @@
 {% extends "layouts/app.html" %}
-{% block title %}New Space{% endblock %}
+{% block title %}Start a Space{% endblock %}
 {% block content %}
-<div class="page-head"><h1>New Space</h1><p>For a club, project, study topic or anything your classmates care about. You'll be its moderator, and you approve who joins.</p></div>
+<div class="page-head"><h1>Start a Space</h1><p>For a club or activity: a football team, chess club, choir, game nights, a fellowship or a volunteering group. Course work belongs in Courses. You'll be the Space's moderator.</p></div>
 <form method="post" class="form panel">
   {% csrf_token %}
   {% if errors %}<div class="form-errors" role="alert">{{ errors|join:" " }}</div>{% endif %}
   <div class="form-row two">
-    <div class="field"><label for="name">Name</label><input id="name" name="name" maxlength="80" required value="{{ data.name|default:'' }}" placeholder="e.g. Robotics Club"></div>
-    <div class="field"><label for="icon">Icon <span class="optional">(optional emoji)</span></label><input id="icon" name="icon" maxlength="4" value="{{ data.icon|default:'' }}" placeholder="🤖"></div>
+    <div class="field"><label for="name">Name</label><input id="name" name="name" maxlength="80" required value="{{ data.name|default:'' }}" placeholder="e.g. CSC Football Team"></div>
+    <div class="field"><label for="icon">Icon <span class="optional">(optional emoji)</span></label><input id="icon" name="icon" maxlength="4" value="{{ data.icon|default:'' }}" placeholder="⚽"></div>
   </div>
-  <div class="field"><label for="description">Description <span class="optional">(optional)</span></label><input id="description" name="description" maxlength="300" value="{{ data.description|default:'' }}"></div>
-  <label class="toggle-row" for="open_to_all"><span class="choice-text"><span>Let anyone in the department join without approval</span><small>Leave off to approve every member yourself. Approval-only Spaces are private: only members see their posts.</small></span><span class="switch"><input type="checkbox" id="open_to_all" name="open_to_all"{% if data.open_to_all %} checked{% endif %}><span></span></span></label>
+  <div class="field"><label for="category">What kind of Space?</label>
+    <select id="category" name="category" required><option value="">Choose one</option>{% for value, label in categories %}<option value="{{ value }}" {% if data.category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="description">Description <span class="optional">(optional)</span></label><input id="description" name="description" maxlength="300" value="{{ data.description|default:'' }}" placeholder="e.g. Training every Saturday, 4pm, school field"></div>
+  <label class="toggle-row" for="private"><span class="choice-text"><span>Private: I approve who joins</span><small>Leave off so anyone in the department can join. Private Spaces' posts are only seen by members.</small></span><span class="switch"><input type="checkbox" id="private" name="private"{% if data.private %} checked{% endif %}><span></span></span></label>
   <div class="field"><label for="rules">Rules <span class="optional">(optional)</span></label><textarea id="rules" name="rules" rows="4" maxlength="2000">{{ data.rules|default:'' }}</textarea></div>
-  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'spaces:list' %}">Cancel</a><button type="submit" class="btn btn-primary">Create Space</button></div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{% url 'spaces:list' %}">Cancel</a><button type="submit" class="btn btn-primary">Start Space</button></div>
 </form>
 {% endblock %}

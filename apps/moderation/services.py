@@ -215,7 +215,9 @@ def remove_content(*, moderator, target_type, target_id, note=""):
         if obj.course_id:
             raise ValidationError("Course Spaces can't be deleted; deactivate the course instead.")
         _log(moderator, dept, ModerationAction.Action.DELETE_SPACE, target_type, obj, note)
-        obj.delete()
+        from apps.spaces.services import delete_space
+
+        delete_space(obj)
         return
 
     anonymous = False

@@ -125,6 +125,7 @@ def test_retrieval_only_sees_visible_department_resources(rep, student, course, 
     mine = upload(rep, course)
     other_course = Course.objects.create(department=other_department, code="CSC 301", title="Elsewhere", level=300, semester=1)
     outsider_rep = make_user(email="orep@example.com", department=other_department)
+    assign_role(user=outsider_rep, role=RoleAssignment.Role.COURSE_REP, department=other_department, level=300)
     upload(outsider_rep, other_course, title="Their merge sort notes")
     hits = retrieval.search(student, "merge sort complexity")
     assert hits and {c.resource_id for c in hits} == {mine.pk}

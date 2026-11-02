@@ -3,7 +3,7 @@
     <span class="space-glyph" aria-hidden="true">{{ space.glyph }}</span>
     <span class="space-card-text">
       <b>{{ space.name }}</b>
-      <span class="small muted">{% if space.requires_approval %}<span aria-label="Approval needed">🔒</span> {% endif %}{% if space.is_official %}Official · {% endif %}{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted{% endif %}</span>
+      <span class="small muted">{% if space.requires_approval %}<span aria-label="Approval needed">🔒</span> {% endif %}{% if space.is_official %}Official · {% elif space.category %}{{ space.get_category_display }} · {% endif %}{{ space.member_count }} member{{ space.member_count|pluralize }}{% if membership.is_muted %} · Muted{% endif %}</span>
     </span>
   </a>
   {% include "partials/space_membership.html" with space=space membership=membership pending=space.pending small=True %}

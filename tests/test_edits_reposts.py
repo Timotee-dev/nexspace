@@ -126,7 +126,7 @@ def test_private_space_posts_cannot_be_reposted(alice, bob, make_user):
 
     course = Course.objects.create(department=alice.department, code="CSC 9", title="T", level=300, semester=1)
     assign_role(user=alice, role=RoleAssignment.Role.COURSE_REP, course=course)
-    club = spaces.create_space(user=alice, name="Inner Circle")
+    club = spaces.create_space(user=alice, name="Inner Circle", requires_approval=True)
     spaces.request_to_join(bob, club)
     spaces.decide_request(manager=alice, join_request=SpaceJoinRequest.objects.get(user=bob), approve=True)
     secret = posts.create_post(author=alice, kind="post", body="members only", space=club)

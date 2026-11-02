@@ -16,6 +16,7 @@ urlpatterns = [
     path("manage/courses/", views.courses_view, name="courses"),
     path("manage/courses/new/", views.course_form_view, name="course-create"),
     path("manage/courses/<int:pk>/", views.course_form_view, name="course-edit"),
+    path("manage/courses/<int:pk>/delete/", views.course_delete_view, name="course-delete"),
     path("manage/sessions/", views.sessions_view, name="sessions"),
     path("manage/sessions/<int:pk>/current/", views.session_current_view, name="session-current"),
     path("manage/spaces/", views.spaces_view, name="spaces"),

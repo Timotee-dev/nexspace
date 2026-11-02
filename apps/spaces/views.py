@@ -13,6 +13,8 @@ from apps.posts.feed import annotate_for_user
 from apps.posts.models import Post
 
 from . import services
+from apps.posts.services import RateLimited
+
 from .models import Space, SpaceJoinRequest, SpaceMembership
 
 SPACE_TABS = [("posts", "Posts"), ("questions", "Questions"), ("members", "Members"), ("about", "About")]
@@ -38,25 +40,24 @@ def _dept_space(request, **lookup):
 
 @login_required
 def space_list_view(request):
-    memberships = {
-        m.space_id: m for m in SpaceMembership.objects.filter(user=request.user)
-    }
-    spaces = list(
-        Space.objects.filter(department_id=request.user.department_id).exclude(kind=Space.Kind.COURSE)
-        .order_by("-is_official", "-member_count", "name")
-    )
+    """Spaces are clubs and activities (sports, games, music, faith...). Course discussions live in Courses;
+    the department and level Spaces are shown separately as "Your class"."""
+    memberships = {m.space_id: m for m in SpaceMembership.objects.filter(user=request.user)}
+    pending = services.pending_request_ids(request.user)
+    spaces = list(Space.objects.filter(department_id=request.user.department_id).exclude(kind=Space.Kind.COURSE)
+                  .order_by("-member_count", "name"))
     for s in spaces:
         s.membership = memberships.get(s.pk)
-    mine = [s for s in spaces if s.membership] + list(
-        Space.objects.filter(pk__in=memberships.keys(), kind=Space.Kind.COURSE).select_related("course")
-    )
-    pending = services.pending_request_ids(request.user)
-    for s in mine + spaces:
-        s.membership = memberships.get(s.pk)
         s.pending = s.pk in pending
+    category = request.GET.get("category", "")
+    if category not in Space.Category.values:
+        category = ""
+    clubs = [s for s in spaces if s.kind == Space.Kind.COMMUNITY and (not category or s.category == category)]
     return render(request, "spaces/list.html", {
-        "mine": mine,
-        "discover": [s for s in spaces if not s.membership],
+        "mine": [s for s in clubs if s.membership],
+        "discover": [s for s in clubs if not s.membership],
+        "official": [s for s in spaces if s.kind != Space.Kind.COMMUNITY],
+        "categories": Space.Category.choices, "category": category,
         "can_create": services.can_create_space(request.user),
     })
 
@@ -87,7 +88,11 @@ def _space_page(request, space, tab):
         tab = tab_keys[0]
     can_manage = services.can_manage(user, space)
     can_see = services.can_see_inside(user, space)
-    if not can_see:  # private Space: outsiders only see About and the request button
+    if not can_see and course:  # course not joined: materials are for everyone, discussions for members
+        tabs = [(k, label) for k, label in tabs if k in ("resources", "past-questions", "upcoming")]
+        if tab not in [k for k, _ in tabs]:
+            tab = tabs[0][0]
+    elif not can_see:  # private Space: outsiders only see About and the request button
         tabs = [("about", "About")]
         tab = "about"
     elif can_manage and space.requires_approval:
@@ -102,9 +107,9 @@ def _space_page(request, space, tab):
         "request_count": space.join_requests.filter(status="pending").count() if can_manage else 0,
     }
     if course:
-        reps = User.objects.filter(role_assignments__role=RoleAssignment.Role.COURSE_REP,
-                                   role_assignments__course=course, is_active=True).select_related("profile")
-        context["reps"] = list(reps)
+        from apps.accounts.services import level_reps
+
+        context["reps"] = list(level_reps(course.department, course.level).select_related("profile"))
         context["is_rep"] = user.has_role(RoleAssignment.Role.COURSE_REP, course=course)
 
     if tab in ("posts", "discussions", "questions"):
@@ -226,12 +231,14 @@ def space_create_view(request):
         try:
             space = services.create_space(
                 user=request.user, name=data.get("name", ""), description=data.get("description", ""),
-                rules=data.get("rules", ""), icon=data.get("icon", ""),
-                requires_approval=data.get("open_to_all") != "on",
+                rules=data.get("rules", ""), icon=data.get("icon", ""), category=data.get("category", ""),
+                requires_approval=data.get("private") == "on",
             )
         except (ValidationError, PermissionDenied) as exc:
             errors = getattr(exc, "messages", [str(exc)])
+        except RateLimited as exc:
+            errors = [str(exc)]
         else:
-            messages.success(request, f"{space.name} is ready. You'll approve people who ask to join.")
+            messages.success(request, f"{space.name} is ready. Invite people to join.")
             return redirect(space.get_absolute_url())
-    return render(request, "spaces/create.html", {"errors": errors, "data": data})
+    return render(request, "spaces/create.html", {"errors": errors, "data": data, "categories": Space.Category.choices})

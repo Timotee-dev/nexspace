@@ -44,7 +44,7 @@ def student(make_user):
 
 @pytest.fixture
 def club(rep):
-    return spaces.create_space(user=rep, name="Robotics Club")
+    return spaces.create_space(user=rep, name="Robotics Club", requires_approval=True)
 
 
 def test_who_can_create(make_user, department, rep, student):
@@ -53,12 +53,58 @@ def test_who_can_create(make_user, department, rep, student):
     admin = make_user(email="adm@example.com")
     assign_role(user=admin, role=RoleAssignment.Role.DEPARTMENT_ADMIN, department=department)
     assert spaces.can_create_space(rep) and spaces.can_create_space(mod) and spaces.can_create_space(admin)
-    assert not spaces.can_create_space(student)
+    assert spaces.can_create_space(student)  # Spaces are clubs and activities: any verified student
+    assert not spaces.can_create_space(make_user(email="unverified@example.com", verified=False))
 
 
-def test_course_spaces_stay_open(course, student):
-    assert not course.space.requires_approval
-    assert spaces.join(student, course.space) is True
+def test_own_level_students_join_their_courses_directly(course, student):
+    assert course.space.requires_approval and student.level == 300 == course.level
+    assert spaces.request_to_join(student, course.space) == "joined"
+
+
+def test_other_levels_need_their_course_reps_or_an_admin(run_hooks, client, course, rep, make_user, department):
+    """A 200 Level student asking to join a 300 Level course: the 300 Level reps, the course's lecturer
+    and the admins are notified; only they can approve (a 100 Level rep can't)."""
+    carryover = make_user(email="carry@example.com", level=200, full_name="Carry Over")
+    rep100 = make_user(email="rep100@example.com", level=100)
+    assign_role(user=rep100, role=RoleAssignment.Role.COURSE_REP, department=department, level=100)
+    lecturer = make_user(email="lect@example.com")
+    assign_role(user=lecturer, role=RoleAssignment.Role.LECTURER, course=course)
+    admin = make_user(email="adm@example.com")
+    assign_role(user=admin, role=RoleAssignment.Role.DEPARTMENT_ADMIN, department=department)
+    assert run_hooks(spaces.request_to_join, carryover, course.space) == "requested"
+    notified = set(Notification.objects.filter(kind="space_request").values_list("recipient__email", flat=True))
+    assert notified == {"rep@example.com", "lect@example.com", "adm@example.com"}  # not the 100 Level rep
+    note = Notification.objects.filter(kind="space_request").first()
+    assert "(200 Level)" in note.text and note.url.endswith("?tab=requests")
+    join_request = SpaceJoinRequest.objects.get(user=carryover)
+    with pytest.raises(PermissionDenied):
+        spaces.decide_request(manager=rep100, join_request=join_request, approve=True)
+    client.force_login(rep)  # the 300 Level rep sees and approves it
+    page = client.get(course.get_absolute_url() + "?tab=requests").content.decode()
+    assert "Carry Over" in page
+    spaces.decide_request(manager=rep, join_request=join_request, approve=True)
+    assert spaces.is_member(carryover, course.space)
+
+
+def test_admin_approves_any_level_and_non_members_still_see_materials(client, course, make_user, department):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.management.commands.seed_demo import make_pdf
+    from apps.resources import services as resources
+
+    outsider = make_user(email="out@example.com", level=100)
+    admin = make_user(email="adm@example.com")
+    assign_role(user=admin, role=RoleAssignment.Role.DEPARTMENT_ADMIN, department=department)
+    resources.upload(user=admin, course=course, title="Past exam 2024", resource_type="past_question",
+                     file=SimpleUploadedFile("e.pdf", make_pdf([["Question one about trees and graphs."]])))
+    client.force_login(outsider)
+    page = client.get(course.get_absolute_url()).content.decode()
+    assert "Past exam 2024" in page and "Request to join" in page  # materials open; discussions need joining
+    assert client.get(course.get_absolute_url() + "?tab=discussions").status_code == 200
+    spaces.request_to_join(outsider, course.space)
+    spaces.decide_request(manager=admin, join_request=SpaceJoinRequest.objects.get(user=outsider), approve=True)
+    assert spaces.is_member(outsider, course.space)
 
 
 def test_request_approve_flow(run_hooks, club, rep, student, client):
@@ -133,10 +179,12 @@ def test_views_approve_decline_and_remove(client, club, rep, student, make_user)
 
 def test_open_toggle_when_creating(client, rep, student):
     client.force_login(rep)
-    client.post(reverse("spaces:create"), {"name": "General Chat", "open_to_all": "on"})
+    client.post(reverse("spaces:create"), {"name": "General Chat", "category": "social"})
     space = Space.objects.get(slug="general-chat")
-    assert not space.requires_approval
+    assert not space.requires_approval and space.category == "social"
     assert spaces.request_to_join(student, space) == "joined"
+    client.post(reverse("spaces:create"), {"name": "Chess Club", "category": "games", "private": "on"})
+    assert Space.objects.get(slug="chess-club").requires_approval
 
 
 def test_onboarding_sends_requests(client, make_user, club, course):

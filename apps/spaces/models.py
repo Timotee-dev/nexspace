@@ -9,6 +9,16 @@ from django.urls import reverse
 
 
 class Space(models.Model):
+    class Category(models.TextChoices):
+        SPORTS = "sports", "Sports & fitness"
+        GAMES = "games", "Games & esports"
+        ARTS = "arts", "Music, art & drama"
+        TECH = "tech", "Tech & projects"
+        FAITH = "faith", "Faith & fellowship"
+        SOCIAL = "social", "Hangouts & social"
+        SERVICE = "service", "Volunteering & causes"
+        OTHER = "other", "Other"
+
     class Kind(models.TextChoices):
         COMMUNITY = "community", "Community"
         COURSE = "course", "Course"
@@ -28,7 +38,10 @@ class Space(models.Model):
     icon = models.CharField(max_length=4, blank=True, help_text="An emoji or short symbol")
     is_official = models.BooleanField(default=False)
     # Approval-only Spaces are private: only approved members see their posts and member list.
-    # Course Spaces stay open, since joining a course is how students get its materials.
+    # Course Spaces need approval too (from that level's course reps, the lecturer or an admin), except
+    # for students of the course's own level, who join straight away. Materials stay visible to everyone.
+    category = models.CharField(max_length=10, choices=Category.choices, blank=True,
+                                help_text="Clubs and activities only")
     requires_approval = models.BooleanField(
         default=True, help_text="Members must be approved by the Space's managers before they can join"
     )

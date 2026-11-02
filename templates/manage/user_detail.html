@@ -30,9 +30,10 @@
       <form method="post" action="{% url 'manage:user-action' member.pk %}" data-confirm="Remove this role?">{% csrf_token %}<input type="hidden" name="action" value="revoke_role"><input type="hidden" name="assignment" value="{{ ra.pk }}"><button type="submit" class="btn btn-quiet btn-sm">Remove</button></form></li>
     {% empty %}<li class="muted small">Student (no extra roles).</li>{% endfor %}
   </ul>
-  <form method="post" action="{% url 'manage:user-action' member.pk %}" class="form role-form">{% csrf_token %}<input type="hidden" name="action" value="assign_role">
-    <div class="form-row two">{% include "partials/field.html" with field=role_form.role %}{% include "partials/field.html" with field=role_form.course %}</div>
-    {% include "partials/field.html" with field=role_form.level %}
+  <form method="post" action="{% url 'manage:user-action' member.pk %}" class="form role-form" data-role-form>{% csrf_token %}<input type="hidden" name="action" value="assign_role">
+    {% include "partials/field.html" with field=role_form.role %}
+    <div data-for-roles="lecturer">{% include "partials/field.html" with field=role_form.course %}</div>
+    <div data-for-roles="course_rep level_adviser">{% include "partials/field.html" with field=role_form.level %}</div>
     <div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">Assign role</button></div>
   </form>
 </section>

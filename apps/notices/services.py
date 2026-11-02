@@ -25,12 +25,15 @@ def publish_scope(user):
     if is_exam:
         courses = set(Course.objects.filter(department=dept, is_active=True).values_list("pk", flat=True))
     else:
-        courses = set(assignments.filter(role__in=[R.COURSE_REP, R.LECTURER], course__isnull=False)
-                      .values_list("course_id", flat=True))
+        from apps.accounts.services import managed_courses
+
+        courses = set(managed_courses(user).values_list("pk", flat=True))
     if is_exam:
         levels = {value for value, _ in Level.choices}
     else:
-        levels = set(assignments.filter(role=R.LEVEL_ADVISER, department=dept).values_list("level", flat=True))
+        # level advisers and course reps can announce to their level
+        levels = set(assignments.filter(role__in=[R.LEVEL_ADVISER, R.COURSE_REP], department=dept, level__isnull=False)
+                     .values_list("level", flat=True))
     return {"admin": is_admin, "department": is_exam, "spaces": is_admin, "courses": courses, "levels": levels}
 
 

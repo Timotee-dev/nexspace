@@ -67,12 +67,15 @@ def test_course_gets_official_space(course):
     assert course.space.is_official and course.space.kind == Space.Kind.COURSE
 
 
-def test_course_rep_scope(rep, course, other_course, dept_admin):
+def test_course_rep_scope(rep, course, other_course, dept_admin, department):
+    # Course reps are per level: the 300 Level rep covers every 300 Level course, and no other level.
     assert rep.has_role(RoleAssignment.Role.COURSE_REP, course=course)
-    assert not rep.has_role(RoleAssignment.Role.COURSE_REP, course=other_course)
-    assert dept_admin.has_role(RoleAssignment.Role.COURSE_REP, course=other_course)
-    membership = SpaceMembership.objects.get(space=course.space, user=rep)
-    assert membership.role == SpaceMembership.Role.MODERATOR
+    assert rep.has_role(RoleAssignment.Role.COURSE_REP, course=other_course)
+    level200 = Course.objects.create(department=department, code="CSC 201", title="Programming", level=200, semester=1)
+    assert not rep.has_role(RoleAssignment.Role.COURSE_REP, course=level200)
+    assert dept_admin.has_role(RoleAssignment.Role.COURSE_REP, course=level200)
+    ra = rep.role_assignments.get(role=RoleAssignment.Role.COURSE_REP)
+    assert ra.course_id is None and ra.level == 300 and ra.department_id == department.pk
 
 
 def test_join_leave_mute_and_feeds(student, make_user, course):
@@ -103,16 +106,27 @@ def test_other_department_cannot_join(make_user, other_department, course):
         spaces.join(outsider, course.space)
 
 
-def test_only_reps_and_above_create_spaces(client, student, rep, make_user):
+def test_any_verified_student_starts_a_club_space(client, student, make_user):
+    unverified = make_user(email="new@example.com", verified=False)
     with pytest.raises(PermissionDenied):
-        spaces.create_space(user=student, name="Robotics Club")
+        spaces.create_space(user=unverified, name="Chess Club", category="games")
+    with pytest.raises(ValidationError):
+        spaces.create_space(user=student, name="Chess Club", category="not-a-kind")
+    space = spaces.create_space(user=student, name="Robotics Club", icon="🤖", category="tech")
+    assert space.slug == "robotics-club" and space.member_count == 1 and not space.requires_approval
+    assert space.kind == Space.Kind.COMMUNITY and space.get_category_display() == "Tech & projects"
+    assert SpaceMembership.objects.get(space=space, user=student).role == "moderator"
     client.force_login(student)
-    assert client.get(reverse("spaces:create")).status_code == 403
-    space = spaces.create_space(user=rep, name="Robotics Club", icon="🤖")
-    assert space.slug == "robotics-club" and space.member_count == 1 and space.requires_approval
-    assert SpaceMembership.objects.get(space=space, user=rep).role == "moderator"
-    client.force_login(rep)
+    assert client.get(reverse("spaces:create")).status_code == 200
     assert client.get(reverse("spaces:detail", args=[space.slug])).status_code == 200
+    page = client.get(reverse("spaces:list") + "?category=tech").content.decode()
+    assert "Robotics Club" in page
+    assert "Robotics Club" not in client.get(reverse("spaces:list") + "?category=sports").content.decode()
+    spaces.create_space(user=student, name="Choir", category="arts")
+    spaces.create_space(user=student, name="Football", category="sports")
+    from apps.posts.services import RateLimited
+    with pytest.raises(RateLimited):  # three new Spaces a day per person
+        spaces.create_space(user=student, name="Fourth", category="other")
 
 
 def test_course_pages_render_every_tab(client, student, course):
@@ -133,17 +147,26 @@ def test_onboarding_joins_chosen_spaces(client, make_user, course):
 
 
 # --- Resources -------------------------------------------------------------------
-def test_upload_publishes_immediately_with_badges(rep, student, course):
+def test_only_reps_lecturers_and_admins_upload(rep, student, course, dept_admin, make_user, department):
     official = resources.upload(user=rep, course=course, title="Exam 2023", file=pdf(), resource_type="past_question", exam_type="exam")
-    shared = resources.upload(user=student, course=course, title="My notes", file=pdf(), resource_type="lecture_note")
-    assert official.is_verified_upload and not shared.is_verified_upload
-    assert set(Resource.objects.for_viewer(student)) == {official, shared}
-    assert shared.exam_type == ""
+    by_admin = resources.upload(user=dept_admin, course=course, title="My notes", file=pdf(), resource_type="lecture_note")
+    assert official.is_verified_upload and by_admin.is_verified_upload and by_admin.exam_type == ""
+    assert set(Resource.objects.for_viewer(student)) == {official, by_admin}  # everyone can read them
+    with pytest.raises(PermissionDenied):
+        resources.upload(user=student, course=course, title="x", file=pdf(), resource_type="lecture_note")
+    level200 = Course.objects.create(department=department, code="CSC 201", title="Programming", level=200, semester=1)
+    with pytest.raises(PermissionDenied):  # the 300 Level rep can't upload to a 200 Level course
+        resources.upload(user=rep, course=level200, title="x", file=pdf(), resource_type="lecture_note")
+    lecturer = make_user(email="lect@example.com")
+    assign_role(user=lecturer, role=RoleAssignment.Role.LECTURER, course=level200)
+    resources.upload(user=lecturer, course=level200, title="Week 1", file=pdf(), resource_type="slides")
+    with pytest.raises(PermissionDenied):  # ...and only for the courses they teach
+        resources.upload(user=lecturer, course=course, title="x", file=pdf(), resource_type="slides")
 
 
-def test_upload_rejects_disguised_files(student, course):
+def test_upload_rejects_disguised_files(rep, course):
     with pytest.raises(ValidationError):
-        resources.upload(user=student, course=course, title="x", file=SimpleUploadedFile("x.pdf", b"MZ exe"),
+        resources.upload(user=rep, course=course, title="x", file=SimpleUploadedFile("x.pdf", b"MZ exe"),
                          resource_type="other")
 
 
@@ -186,7 +209,7 @@ def test_search_filters_and_sorting(rep, student, course, other_course, universi
                          resource_type="lecture_note")
     b = resources.upload(user=rep, course=course, title="CSC 301 Exam", file=pdf(), resource_type="past_question",
                          session=session)
-    c = resources.upload(user=student, course=other_course, title="Scheduling notes", file=pdf(), resource_type="lecture_note")
+    c = resources.upload(user=rep, course=other_course, title="Scheduling notes", file=pdf(), resource_type="lecture_note")
     qs = Resource.objects.for_viewer(student)
     assert list(resources.search(qs, q="CSC 301 sorting")) == [a]
     assert list(resources.search(qs, q="csc301")) and c not in resources.search(qs, q="csc301")
@@ -196,11 +219,11 @@ def test_search_filters_and_sorting(rep, student, course, other_course, universi
     assert list(resources.search(qs, sort="downloads"))[0] == c
 
 
-def test_remove_resource_permissions(rep, student, course, make_user):
-    r = resources.upload(user=student, course=course, title="Notes", file=pdf(), resource_type="lecture_note")
+def test_remove_resource_permissions(rep, student, course, make_user, dept_admin):
+    r = resources.upload(user=dept_admin, course=course, title="Notes", file=pdf(), resource_type="lecture_note")
     with pytest.raises(PermissionDenied):
-        resources.remove(user=make_user(email="z@example.com"), resource=r)
-    resources.remove(user=rep, resource=r)  # course rep manages course resources
+        resources.remove(user=student, resource=r)
+    resources.remove(user=rep, resource=r)  # the level's course rep manages course resources
     assert not Resource.objects.visible().filter(pk=r.pk).exists()
 
 
@@ -209,6 +232,10 @@ def test_library_page(client, student, rep, course):
     client.force_login(student)
     r = client.get(reverse("resources:library") + "?q=exam&type=past_question&sort=rated")
     assert r.status_code == 200 and "Exam" in r.content.decode()
+    assert client.get(reverse("resources:upload")).status_code == 403  # students don't upload materials
+    assert b">Upload<" not in client.get(reverse("resources:library")).content
+    client.force_login(rep)
+    assert b">Upload<" in client.get(reverse("resources:library")).content
     r = client.post(reverse("resources:upload"), {"course": course.pk, "title": "Via form", "resource_type": "slides",
                                                    "file": pdf("slides.pdf")})
     assert r.status_code == 302
@@ -224,7 +251,7 @@ def test_announcement_targeting(dept_admin, make_user, course, rep):
     titles = lambda u: {a.title for a in notices.active_announcements_for(u)}  # noqa: E731
     assert titles(l100) == {"All"}
     assert titles(l300) == {"All", "L300"}
-    spaces.join(l100, course.space)
+    spaces.add_member(course.space, l100)  # a 100 Level student added to a 300 Level course
     assert titles(l100) == {"All", "Course"}
 
 
@@ -237,11 +264,13 @@ def test_announcements_expire_to_archive(client, dept_admin, student):
     assert "Soon gone" in client.get(reverse("notices:announcements") + "?view=archive").content.decode()
 
 
-def test_publishing_permissions(client, rep, student, course, other_course):
+def test_publishing_permissions(client, rep, student, course, other_course, department):
     with pytest.raises(PermissionDenied):
         notices.publish_announcement(user=rep, title="x", body="x")  # department-wide
-    with pytest.raises(PermissionDenied):
-        notices.publish_announcement(user=rep, title="x", body="x", audience=Audience.COURSE, target_course=other_course)
+    level200 = Course.objects.create(department=department, code="CSC 201", title="Programming", level=200, semester=1)
+    with pytest.raises(PermissionDenied):  # reps announce only for their own level's courses
+        notices.publish_announcement(user=rep, title="x", body="x", audience=Audience.COURSE, target_course=level200)
+    notices.publish_announcement(user=rep, title="x", body="x", audience=Audience.COURSE, target_course=other_course)
     with pytest.raises(PermissionDenied):
         notices.publish_announcement(user=student, title="x", body="x", audience=Audience.COURSE, target_course=course)
     client.force_login(student)

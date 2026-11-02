@@ -107,8 +107,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         Super admins hold every role everywhere. Department admins (including the HOD) act as
         course reps, lecturers, level advisers, exam officers and moderators for their department.
-        Lecturers act as course reps for their courses. Course-scoped assignments count for that
-        course; level-scoped ones for that level; department-scoped ones for the department.
+        Lecturers act as course reps for their courses. Course reps are appointed per level, so a
+        100 Level rep counts as the rep for every 100 Level course in their department.
+        Course-scoped assignments count for that course; level-scoped ones for that level;
+        department-scoped ones for the department.
         """
         if not self.is_active:
             return False
@@ -132,7 +134,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         whole_dept = Q(department=department, course__isnull=True, level__isnull=True)
         scope = whole_dept | Q(department__isnull=True, course__isnull=True, level__isnull=True)
         if course is not None:
-            scope |= Q(course=course)
+            scope |= Q(course=course) | Q(department=department, level=course.level, course__isnull=True)
         if level is not None:
             scope |= Q(department=department, level=level)
         return assignments.filter(scope).exists()

@@ -26,8 +26,13 @@ def course(department):
 
 
 @pytest.fixture
-def uploader(make_user):
-    return make_user(email="up@example.com", full_name="Uploader")
+def uploader(make_user, department):
+    from apps.accounts.models import RoleAssignment
+    from apps.accounts.services import assign_role
+
+    user = make_user(email="up@example.com", full_name="Uploader")
+    assign_role(user=user, role=RoleAssignment.Role.DEPARTMENT_ADMIN, department=department)
+    return user
 
 
 @pytest.fixture

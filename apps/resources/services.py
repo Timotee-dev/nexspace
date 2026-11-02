@@ -32,12 +32,22 @@ def is_verified_uploader(user, course) -> bool:
     return user.has_role(RoleAssignment.Role.COURSE_REP, course=course)
 
 
+def can_upload(user, course) -> bool:
+    """Only the right people publish course materials, so nothing wrong gets uploaded: that level's
+    course reps, the course's lecturers and department admins. Everyone can still discuss."""
+    return (user.is_authenticated and course is not None and course.department_id == user.department_id
+            and user.has_role(RoleAssignment.Role.COURSE_REP, course=course))
+
+
 @transaction.atomic
 def upload(*, user, course, title, file, resource_type, description="", exam_type="", session=None, semester=None):
     """Publish immediately — there is no approval queue (spec Section 14)."""
     require_verified(user)
     if course.department_id != user.department_id:
         raise PermissionDenied("You can only share resources for courses in your department.")
+    if not can_upload(user, course):
+        raise PermissionDenied(f"Only the {course.level} Level course reps, the course's lecturer and admins can "
+                               "upload materials. You can share it with them, or post it in the discussion.")
     _limit(user, "resource-upload", UPLOAD_RATE)
     title = " ".join((title or "").split())
     if not title:

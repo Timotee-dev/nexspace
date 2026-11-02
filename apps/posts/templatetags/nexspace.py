@@ -81,3 +81,13 @@ def percent(part, whole):
 @register.filter
 def get_item(mapping, key):
     return mapping.get(key) if hasattr(mapping, "get") else None
+
+
+@register.filter
+def needs_approval(space, user):
+    """Whether joining this Space needs someone's approval for this person. Students of a course's own
+    level join its course Space straight away; other courses need the level's reps, lecturer or an admin."""
+    if not getattr(space, "requires_approval", False):
+        return False
+    course = getattr(space, "course", None) if getattr(space, "course_id", None) else None
+    return not (course is not None and getattr(user, "level", None) and course.level == user.level)

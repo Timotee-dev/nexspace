@@ -35,7 +35,10 @@ def library_view(request):
     qs = Resource.objects.for_viewer(user).select_related("course", "session", "uploaded_by__staff_profile")
     resources = list(services.search(qs, **params)[:60])
     uni = user.department.faculty.university_id if user.department_id else None
+    from apps.accounts.services import managed_courses
+
     return render(request, "resources/library.html", {
+        "can_upload": managed_courses(request.user).exists(),
         "resources": resources, "params": params, "sorts": services.SORTS,
         "types": Resource.Type.choices, "levels": Level.choices, "semesters": Semester.choices,
         "courses": Course.objects.filter(department_id=user.department_id, is_active=True),
@@ -46,6 +49,10 @@ def library_view(request):
 
 @login_required
 def upload_view(request):
+    from apps.accounts.services import managed_courses
+
+    if not managed_courses(request.user).exists():
+        return render(request, "resources/upload_not_allowed.html", status=403)
     initial = {}
     if request.GET.get("course"):
         initial["course"] = Course.objects.filter(slug=request.GET["course"], department_id=request.user.department_id).first()

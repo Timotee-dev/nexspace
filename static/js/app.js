@@ -605,3 +605,14 @@ document.addEventListener("click", (event) => {
   const field = event.target.closest("[data-select-on-click]");
   if (field) field.select();
 });
+
+// Role form (Admin → People): only show the box that the chosen role needs
+// (course reps and level advisers: a level; lecturers: a course).
+document.querySelectorAll("[data-role-form]").forEach((form) => {
+  const role = form.querySelector('[name="role"]');
+  const sync = () => form.querySelectorAll("[data-for-roles]").forEach((box) => {
+    box.hidden = !box.dataset.forRoles.split(" ").includes(role.value);
+  });
+  role?.addEventListener("change", sync);
+  if (role) sync();
+});

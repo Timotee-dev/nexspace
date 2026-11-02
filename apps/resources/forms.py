@@ -27,7 +27,9 @@ class ResourceUploadForm(forms.Form):
             help_text += " Text in photos and scanned pages is read automatically, so people can search it."
         self.fields["file"].help_text = help_text
         self.fields["file"].widget.attrs["accept"] = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
-        self.fields["course"].queryset = Course.objects.filter(department_id=user.department_id, is_active=True)
+        from apps.accounts.services import managed_courses
+
+        self.fields["course"].queryset = managed_courses(user).order_by("level", "code")
         uni = user.department.faculty.university_id if user.department_id else None
         self.fields["session"].queryset = AcademicSession.objects.filter(university_id=uni)
 

@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core import signing
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -147,12 +148,31 @@ def send_verification_email(user) -> None:
 
 
 # --- Roles -----------------------------------------------------------------
-COURSE_ROLES = ("course_rep", "lecturer")
+COURSE_ROLES = ("lecturer",)
+MAX_REPS_PER_LEVEL = 2  # the course rep and an assistant
+
+
+def _rep_scope(role, department, course, level):
+    """Course reps are per level: "rep for CSC 301" means "rep for 300 Level in that department"."""
+    if role == "course_rep" and course is not None:
+        return course.department, None, course.level
+    return department, course, level
 
 
 def assign_role(*, user, role, department=None, course=None, level=None, granted_by=None):
+    from django.core.exceptions import ValidationError
+
     from .models import RoleAssignment
 
+    department, course, level = _rep_scope(role, department, course, level)
+    if role == "course_rep":
+        if department is None or level is None:
+            raise ValidationError("Choose the level they are course rep for.")
+        others = RoleAssignment.objects.filter(role=role, department=department, level=level).exclude(user=user)
+        if others.count() >= MAX_REPS_PER_LEVEL:
+            names = ", ".join(others.values_list("user__full_name", flat=True))
+            raise ValidationError(f"{level} Level already has {MAX_REPS_PER_LEVEL} course reps ({names}). "
+                                  "Remove one first.")
     if course is not None:
         department, level = None, None  # course scope replaces department scope
     assignment, created = RoleAssignment.objects.get_or_create(
@@ -172,6 +192,7 @@ def assign_role(*, user, role, department=None, course=None, level=None, granted
 def revoke_role(*, user, role, department=None, course=None, level=None, revoked_by=None) -> bool:
     from .models import RoleAssignment
 
+    department, course, level = _rep_scope(role, department, course, level)
     deleted, _ = RoleAssignment.objects.filter(user=user, role=role, department=department, course=course,
                                                level=level).delete()
     if deleted:
@@ -311,3 +332,33 @@ def verify_staff(*, admin, staff, approve: bool, note="", courses=None):
     notifications.staff_decided(staff)
     return staff
 
+
+
+# --- Who manages which courses -------------------------------------------------------------
+def level_reps(department, level):
+    """The course reps (up to two) for one level of a department."""
+    from .models import RoleAssignment, User
+
+    return User.objects.filter(is_active=True, role_assignments__role=RoleAssignment.Role.COURSE_REP,
+                               role_assignments__department=department, role_assignments__level=level).distinct()
+
+
+def managed_courses(user):
+    """Courses this person may upload materials to and approve join requests for:
+    department admins: every course in the department; course reps: every course of their level(s);
+    lecturers: the courses they teach."""
+    from apps.academics.models import Course
+
+    from .models import RoleAssignment
+
+    R = RoleAssignment.Role
+    courses = Course.objects.filter(department_id=user.department_id, is_active=True)
+    if not user.is_authenticated or not user.department_id:
+        return courses.none()
+    if user.has_role(R.DEPARTMENT_ADMIN, department=user.department):
+        return courses
+    assignments = user.role_assignments.all()
+    levels = list(assignments.filter(role=R.COURSE_REP, department_id=user.department_id, level__isnull=False)
+                  .values_list("level", flat=True))
+    taught = list(assignments.filter(role=R.LECTURER, course__isnull=False).values_list("course_id", flat=True))
+    return courses.filter(Q(level__in=levels) | Q(pk__in=taught))

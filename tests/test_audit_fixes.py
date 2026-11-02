@@ -31,7 +31,7 @@ def rep(make_user, course):
 
 
 def test_profile_replies_hide_private_space_comments(client, rep, make_user):
-    club = spaces.create_space(user=rep, name="Secret Club")
+    club = spaces.create_space(user=rep, name="Secret Club", requires_approval=True)
     member = make_user(email="m@example.com", full_name="Member")
     spaces.request_to_join(member, club)
     spaces.decide_request(manager=rep, join_request=SpaceJoinRequest.objects.get(user=member), approve=True)

@@ -35,7 +35,8 @@ from apps.resources.models import Resource
 from apps.core.net import safe_next
 
 AUDIT_PHRASES = {
-    "account.deleted": "deleted their account", "announcement.removed": "removed an announcement",
+    "account.deleted": "deleted their account", "course.deleted": "deleted a course",
+    "platform.fresh_start": "did a fresh start (deleted all test data)", "announcement.removed": "removed an announcement",
     "anonymous.revealed": "revealed who wrote an anonymous post", "course.saved": "saved a course",
     "department.created": "created a department", "role.assigned": "gave a role to", "role.revoked": "removed a role from",
     "space.saved": "saved a Space", "staff.requested": "signed up as staff", "staff.verified": "verified staff account",

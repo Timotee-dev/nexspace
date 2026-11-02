@@ -349,7 +349,7 @@ def test_admin_manages_courses_roles_and_accounts(client, admin, alice, departme
     course = Course.objects.get(code="CSC 401")
     assert course.space.is_official
     client.post(reverse("manage:user-action", args=[alice.pk]), {"action": "assign_role", "role": "course_rep",
-                                                                 "course": course.pk})
+                                                                 "level": 400})  # reps are appointed per level
     assert alice.has_role(RoleAssignment.Role.COURSE_REP, course=course)
     ra = alice.role_assignments.get()
     client.post(reverse("manage:user-action", args=[alice.pk]), {"action": "revoke_role", "assignment": ra.pk})

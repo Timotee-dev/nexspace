@@ -1,5 +1,6 @@
 """Create demo data for local development. Refuses to run when DEBUG is False."""
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -142,7 +143,9 @@ class Command(BaseCommand):
             user.profile.skills = skills
             user.profile.save()
             user.profile.interests.set(Topic.objects.filter(slug__in=interests))
-            if role:
+            if role == RoleAssignment.Role.COURSE_REP:
+                assign_role(user=user, role=role, department=dept, level=level)  # course reps are per level
+            elif role:
                 scope = None if role == RoleAssignment.Role.SUPER_ADMIN else dept
                 assign_role(user=user, role=role, department=scope)
             if role == RoleAssignment.Role.SUPER_ADMIN:
@@ -273,6 +276,7 @@ class Command(BaseCommand):
                                  ("Programming", "⌨️", "Code, bugs and side projects."),
                                  ("AI & Machine Learning", "🤖", "Models, papers and experiments."),
                                  ("Internships & SIWES", "💼", "Placements, applications and advice.")):
+            cache.delete(f"rl:space-create:{users['mod'].pk}")  # demo data: skip the 3-a-day limit
             spaces.create_space(user=users["mod"], name=name, description=desc, icon=icon,
                                 requires_approval=name != "General Discussion")
 
@@ -304,7 +308,7 @@ class Command(BaseCommand):
              "Mid-semester test on stacks, queues and linked lists."),
             (rep, csc301, "Lecture 4: Sorting algorithms", Resource.Type.LECTURE_NOTE, "", "2025/2026",
              "Bubble, insertion, merge and quick sort with complexity analysis."),
-            (users["student"], csc301, "My summary notes: trees and heaps", Resource.Type.LECTURE_NOTE, "", "2025/2026",
+            (rep, csc301, "My summary notes: trees and heaps", Resource.Type.LECTURE_NOTE, "", "2025/2026",
              "Condensed notes I made while revising."),
             (users["deptadmin"], Course.objects.get(department=dept, code="CSC 305"), "CSC 305 Exam 2023/2024",
              Resource.Type.PAST_QUESTION, "exam", "2023/2024", "Processes, scheduling, memory management."),
@@ -319,7 +323,7 @@ class Command(BaseCommand):
             ))
         resources.rate(user=users["student"], resource=made[0], stars=5, review="Exactly what came out last year.")
         resources.rate(user=users["mod"], resource=made[0], stars=4)
-        resources.rate(user=users["rep"], resource=made[3], stars=5, review="Clear and short. Thanks!")
+        resources.rate(user=users["student"], resource=made[3], stars=5, review="Clear and short. Thanks!")
         for u in (users["student"], users["mod"], users["deptadmin"]):
             resources.record_download(user=u, resource=made[0])
 

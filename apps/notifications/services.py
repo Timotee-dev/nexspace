@@ -198,15 +198,14 @@ def resource_uploaded(resource):
 
 @safely
 def join_requested(space, user):
-    from apps.accounts.models import RoleAssignment, User
-    from apps.spaces.models import SpaceMembership
+    """Tell everyone who can approve: for a course, that level's course reps, its lecturers and the admins."""
+    from apps.spaces.services import space_managers
 
-    managers = {m.user for m in SpaceMembership.objects.filter(space=space, role="moderator").select_related("user")}
-    if not managers:  # fall back to the department admins
-        managers = set(User.objects.filter(role_assignments__role=RoleAssignment.Role.DEPARTMENT_ADMIN,
-                                           role_assignments__department=space.department, is_active=True))
+    managers = set(space_managers(space).exclude(pk=user.pk))
+    page = space.course.get_absolute_url() if space.course_id else space.get_absolute_url()
+    level = f" ({user.level} Level)" if user.level else ""
     notify(list(managers), category=Category.SOCIAL, kind=Notification.Kind.SPACE_REQUEST,
-           text=f"{user.full_name} asked to join {space.name}", url=f"{space.get_absolute_url()}?tab=requests",
+           text=f"{user.full_name}{level} asked to join {space.name}", url=f"{page}?tab=requests",
            actor=user, dedupe_key=f"space-request:{space.pk}:{user.pk}:{timezone.now():%Y%m%d%H}")
 
 

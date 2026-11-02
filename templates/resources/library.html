@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head topic-head">
   <div><h1>Resources</h1><p>Past questions, lecture notes and slides from every course in your department.</p></div>
-  {% if user.can_write %}<a class="btn btn-primary" href="{% url 'resources:upload' %}">Upload</a>{% endif %}
+  {% if can_upload and user.can_write %}<a class="btn btn-primary" href="{% url 'resources:upload' %}">Upload</a>{% endif %}
 </div>
 <nav class="settings-nav" aria-label="Browse">
   <a href="{% url 'spaces:list' %}">Spaces</a>

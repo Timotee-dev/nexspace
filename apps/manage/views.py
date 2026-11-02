@@ -123,9 +123,10 @@ def users_view(request):
 class RoleForm(forms.Form):
     role = forms.ChoiceField(choices=[(v, l) for v, l in RoleAssignment.Role.choices if v != "super_admin"])
     course = forms.ModelChoiceField(queryset=Course.objects.none(), required=False,
-                                    help_text="For course reps and lecturers", empty_label="Choose a course")
+                                    help_text="Lecturers only: the course they teach", empty_label="Choose a course")
     level = forms.TypedChoiceField(choices=[("", "Choose a level"), *Level.choices], coerce=int, required=False,
-                                   empty_value=None, help_text="For level advisers")
+                                   empty_value=None,
+                                   help_text="Course reps and level advisers: the level (up to 2 course reps per level)")
 
     def __init__(self, *args, department, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -136,8 +137,10 @@ class RoleForm(forms.Form):
 
     def clean(self):
         data = super().clean()
-        if data.get("role") in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LECTURER) and not data.get("course"):
-            self.add_error("course", "Choose the course.")
+        if data.get("role") == RoleAssignment.Role.LECTURER and not data.get("course"):
+            self.add_error("course", "Choose the course they teach.")
+        if data.get("role") == RoleAssignment.Role.COURSE_REP and not data.get("level"):
+            self.add_error("level", "Choose the level they are course rep for.")
         if data.get("role") == RoleAssignment.Role.LEVEL_ADVISER and not data.get("level"):
             self.add_error("level", "Choose the level they advise.")
         return data
@@ -177,9 +180,9 @@ def user_action_view(request, pk):
             role, course, level = form.cleaned_data["role"], form.cleaned_data.get("course"), form.cleaned_data.get("level")
             if role == RoleAssignment.Role.DEPARTMENT_ADMIN and not request.user.is_platform_admin:
                 raise PermissionDenied("Only the platform admin can make someone a department admin.")
-            if role in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LECTURER):
+            if role == RoleAssignment.Role.LECTURER:
                 assign_role(user=member, role=role, course=course, granted_by=request.user)
-            elif role == RoleAssignment.Role.LEVEL_ADVISER:
+            elif role in (RoleAssignment.Role.COURSE_REP, RoleAssignment.Role.LEVEL_ADVISER):
                 assign_role(user=member, role=role, department=dept, level=level, granted_by=request.user)
             else:
                 assign_role(user=member, role=role, department=dept, granted_by=request.user)
@@ -229,8 +232,14 @@ class CourseForm(forms.ModelForm):
 @admin_required
 def courses_view(request):
     dept = request.manage_department
-    courses = Course.objects.filter(department=dept).select_related("space").annotate(
-        reps=Count("role_assignments", filter=Q(role_assignments__role="course_rep")))
+    from apps.accounts.services import level_reps
+
+    courses = list(Course.objects.filter(department=dept).select_related("space").order_by("level", "code"))
+    reps = {}
+    for course in courses:
+        if course.level not in reps:
+            reps[course.level] = ", ".join(level_reps(dept, course.level).values_list("full_name", flat=True))
+        course.reps = reps[course.level]
     return _render(request, "manage/courses.html", {"courses": courses}, "courses")
 
 
@@ -346,6 +355,20 @@ def space_delete_view(request, pk):
     except (ValidationError, PermissionDenied) as exc:
         messages.error(request, _err(exc))
     return redirect("manage:spaces")
+
+
+@admin_required
+@require_POST
+def course_delete_view(request, pk):
+    from apps.core.models import audit
+    from apps.spaces.services import delete_course
+
+    course = get_object_or_404(Course, pk=pk, department=request.manage_department)
+    label = f"{course.code} — {course.title}"
+    audit(request.user, "course.deleted", course, code=course.code)
+    delete_course(course)
+    messages.success(request, f"Deleted {label}.")
+    return redirect("manage:courses")
 
 
 # --- Announcements ----------------------------------------------------------------------

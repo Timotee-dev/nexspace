@@ -88,16 +88,17 @@ def test_role_scoping_and_audit(make_user, department, other_department):
     rep = make_user(email="rep@example.com")
     admin = make_user(email="boss@example.com")
     assert not rep.has_role(RoleAssignment.Role.COURSE_REP)
-    assign_role(user=rep, role=RoleAssignment.Role.COURSE_REP, department=department, granted_by=admin)
-    assert rep.has_role(RoleAssignment.Role.COURSE_REP, department=department)
-    assert not rep.has_role(RoleAssignment.Role.COURSE_REP, department=other_department)
+    assign_role(user=rep, role=RoleAssignment.Role.COURSE_REP, department=department, level=300, granted_by=admin)
+    assert rep.has_role(RoleAssignment.Role.COURSE_REP, department=department, level=300)  # reps are per level
+    assert not rep.has_role(RoleAssignment.Role.COURSE_REP, department=department, level=200)
+    assert not rep.has_role(RoleAssignment.Role.COURSE_REP, department=other_department, level=300)
     assert not rep.has_role(RoleAssignment.Role.DEPARTMENT_ADMIN)
     assert AuditLog.objects.filter(action="role.assigned", target_id=str(rep.pk)).exists()
 
     assign_role(user=admin, role=RoleAssignment.Role.SUPER_ADMIN)
     assert admin.has_role(RoleAssignment.Role.MODERATOR, department=other_department)
 
-    revoke_role(user=rep, role=RoleAssignment.Role.COURSE_REP, department=department, revoked_by=admin)
+    revoke_role(user=rep, role=RoleAssignment.Role.COURSE_REP, department=department, level=300, revoked_by=admin)
     assert not rep.has_role(RoleAssignment.Role.COURSE_REP)
     assert AuditLog.objects.filter(action="role.revoked").exists()
 

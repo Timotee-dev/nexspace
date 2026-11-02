@@ -1,0 +1,10 @@
+{% extends "layouts/app.html" %}
+{% block title %}Upload a resource{% endblock %}
+{% block content %}
+<div class="empty">
+  <h1 class="section-title">Only course reps and admins upload materials</h1>
+  <p>To keep course materials correct, past questions and notes are uploaded by your level's course reps, the course lecturers and department admins.</p>
+  <p class="muted">Have something useful? Send it to your course rep, or share it in the course discussion.</p>
+  <p><a class="btn btn-primary" href="{% url 'spaces:courses' %}">Go to your courses</a></p>
+</div>
+{% endblock %}

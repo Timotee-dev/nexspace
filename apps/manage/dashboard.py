@@ -70,14 +70,20 @@ def dashboard_view(request):
                                   .select_related("user").prefetch_related("requested_courses")[:6]),
             "can_verify": user.is_platform_admin or settings.STAFF_VERIFICATION == "department",
             "no_lecturer": list(active.exclude(role_assignments__role=R.LECTURER)[:8]),
-            "no_rep": list(active.exclude(role_assignments__role=R.COURSE_REP)[:8]),
+            "no_rep": list(active.exclude(level__in=RoleAssignment.objects.filter(
+                role=R.COURSE_REP, department=dept, level__isnull=False).values("level"))[:8]),
         }
         ctx["sections"].append("admin")
 
     # --- Lecturer / course rep -------------------------------------------------------
-    course_ids = assignments.filter(role__in=[R.LECTURER, R.COURSE_REP], course__isnull=False).values_list(
-        "course_id", flat=True)
-    my_courses = list(Course.objects.filter(pk__in=course_ids).select_related("space").order_by("level", "code"))
+    from apps.accounts.services import managed_courses
+
+    if is_admin:  # admins see every course in the admin section; here, only courses they teach or rep
+        course_ids = assignments.filter(role=R.LECTURER, course__isnull=False).values_list("course_id", flat=True)
+        my_courses = list(Course.objects.filter(pk__in=course_ids).select_related("space").order_by("level", "code"))
+    else:
+        my_courses = list(managed_courses(user).select_related("space").order_by("level", "code"))
+    course_ids = [c.pk for c in my_courses]  # join requests for these courses show below
     if my_courses:
         ctx["course_cards"] = _course_cards(user, my_courses)
         spaces = [c.space.pk for c in my_courses if hasattr(c, "space")]

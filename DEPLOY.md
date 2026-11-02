@@ -126,7 +126,7 @@ Then log in, and in `/manage/`:
 2. **Sessions** → add the current academic session and mark it current.
 3. **Courses** → add every course (each gets its official Space automatically).
 4. **Spaces** → add the department Space, one per level, and a few community Spaces (General Discussion, Internships & SIWES…).
-5. After students sign up: **People** → assign each course rep to their course, and one or two moderators.
+5. After students sign up: **People** → assign up to two course reps per level (pick the level), and one or two moderators.
 
 Do **not** run `seed_demo` in production — it refuses to anyway.
 

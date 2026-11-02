@@ -74,6 +74,85 @@ def extract_mentions(text, exclude=None):
     return list(users)
 
 
+# --- Event / opportunity details ------------------------------------------------------------
+def _safe_link(value, label="link"):
+    """Only real web links (http/https). Blocks javascript:, data: and similar tricks."""
+    from django.core.validators import URLValidator
+
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if len(value) > 500:
+        raise ValidationError(f"That {label} is too long.")
+    try:
+        URLValidator(schemes=["http", "https"])(value)
+    except ValidationError:
+        raise ValidationError(f"Enter a full {label} starting with https://")
+    return value
+
+
+def _as_datetime(value, label):
+    from django.utils.dateparse import parse_datetime
+
+    if value in (None, ""):
+        return None
+    if isinstance(value, str):
+        parsed = parse_datetime(value.strip())
+        if parsed is None:
+            raise ValidationError(f"Enter a valid {label}.")
+        value = parsed
+    if not hasattr(value, "tzinfo"):
+        raise ValidationError(f"Enter a valid {label}.")
+    if timezone.is_naive(value):
+        value = timezone.make_aware(value)
+    return value
+
+
+def _as_date(value, label):
+    import datetime
+
+    from django.utils.dateparse import parse_date
+
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    parsed = parse_date(str(value).strip())
+    if parsed is None:
+        raise ValidationError(f"Enter a valid {label}.")
+    return parsed
+
+
+def clean_event(event):
+    """Only the known fields, checked — whatever the website form or the API sent."""
+    if not isinstance(event, dict):
+        raise ValidationError("Add when the event starts.")
+    starts_at = _as_datetime(event.get("starts_at"), "start time")
+    ends_at = _as_datetime(event.get("ends_at"), "end time")
+    if starts_at is None:
+        raise ValidationError("Add when the event starts.")
+    if ends_at and ends_at < starts_at:
+        raise ValidationError("The event can't end before it starts.")
+    return {"starts_at": starts_at, "ends_at": ends_at, "location": str(event.get("location") or "").strip()[:150]}
+
+
+def clean_opportunity(opportunity):
+    if not isinstance(opportunity, dict):
+        raise ValidationError("Add the organization and category.")
+    organization = str(opportunity.get("organization") or "").strip()[:120]
+    category = str(opportunity.get("category") or "").strip()
+    if not organization or category not in OpportunityDetails.Category.values:
+        raise ValidationError("Add the organization and category.")
+    cleaned = {"organization": organization, "category": category,
+               "deadline": _as_date(opportunity.get("deadline"), "deadline"),
+               "apply_url": _safe_link(opportunity.get("apply_url"), "application link")}
+    if any(f.name == "location" for f in OpportunityDetails._meta.get_fields()):
+        cleaned["location"] = str(opportunity.get("location") or "").strip()[:120]
+    return cleaned
+
+
 # --- Posts ------------------------------------------------------------------
 @transaction.atomic
 def create_post(
@@ -124,11 +203,10 @@ def create_post(
             raise ValidationError("The closing time must be in the future.")
     if kind in (Post.Kind.EVENT, Post.Kind.OPPORTUNITY) and not title:
         raise ValidationError("Give it a title.")
-    if kind == Post.Kind.EVENT and not (event and event.get("starts_at")):
-        raise ValidationError("Add when the event starts.")
-    if kind == Post.Kind.OPPORTUNITY and not (opportunity and opportunity.get("organization")
-                                              and opportunity.get("category")):
-        raise ValidationError("Add the organization and category.")
+    if kind == Post.Kind.EVENT:
+        event = clean_event(event)
+    if kind == Post.Kind.OPPORTUNITY:
+        opportunity = clean_opportunity(opportunity)
 
     post = Post.objects.create(
         author=author, department_id=author.department_id, kind=kind, title=title, body=body,

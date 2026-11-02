@@ -32,6 +32,7 @@ from apps.core.models import AuditLog
 from apps.moderation.models import ModerationAction, Report
 from apps.posts.models import Comment, Post
 from apps.resources.models import Resource
+from apps.core.net import safe_next
 
 AUDIT_PHRASES = {
     "account.deleted": "deleted their account", "announcement.removed": "removed an announcement",
@@ -288,7 +289,7 @@ def staff_decision_view(request, pk):
 
         picked = None
         if staff.position == "lecturer" and "courses_submitted" in request.POST:
-            picked = list(Course.objects.filter(pk__in=request.POST.getlist("courses"),
+            picked = list(Course.objects.filter(pk__in=[c for c in request.POST.getlist("courses") if c.isdigit()],
                                                 department=staff.user.department))
         verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""),
                      courses=picked)
@@ -296,7 +297,7 @@ def staff_decision_view(request, pk):
                                   f"{'verified as ' + staff.get_position_display() if approve else 'not verified'}.")
     except PermissionDenied as exc:
         messages.error(request, str(exc) or "You can't verify this account.")
-    return redirect(request.POST.get("next") or "platform:staff")
+    return redirect(safe_next(request, request.POST.get("next"), reverse("platform:staff")))
 
 
 @platform_required

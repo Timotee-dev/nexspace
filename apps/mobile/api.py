@@ -28,6 +28,7 @@ from apps.accounts import services as accounts
 from apps.accounts.models import User
 from apps.accounts.serializers import MeSerializer, SignupSerializer
 from apps.core import ratelimit
+from apps.core.net import int_param
 from apps.core.throttles import AuthRateThrottle
 from apps.posts.services import RateLimited
 
@@ -122,8 +123,12 @@ class SignupAPIView(APIView):
     throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
+        from apps.accounts import limits
+
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not limits.signup_allowed(request):
+            return _error("throttled", "Too many accounts have been created from this connection. Try again later.", 429)
         data = serializer.validated_data
         with transaction.atomic():
             user = accounts.register_user(
@@ -171,6 +176,10 @@ class ResendCodeAPIView(APIView):
             return _error("already_verified", "Your email is already verified.")
         if not cache.add(f"resend-verify:{request.user.pk}", 1, 60):
             return _error("throttled", "A code was sent less than a minute ago. Check your inbox and spam folder.", 429)
+        from apps.accounts import limits
+
+        if not limits.verify_email_allowed(request.user):
+            return _error("throttled", "You've asked for a lot of codes today. Use the newest email, or try again tomorrow.", 429)
         accounts.send_verification_email(request.user)
         return Response({"detail": f"We sent a new code to {request.user.email}."})
 
@@ -185,9 +194,13 @@ class PasswordResetAPIView(APIView):
     def post(self, request):
         from django.contrib.auth.forms import PasswordResetForm
 
-        form = PasswordResetForm({"email": (request.data.get("email") or "").strip().lower()})
-        if form.is_valid():
-            form.save(request=request, use_https=request.is_secure(),
+        from apps.accounts import limits
+
+        email = (request.data.get("email") or "").strip().lower()
+        form = PasswordResetForm({"email": email})
+        if form.is_valid() and limits.reset_allowed(request, email):
+            domain, https = limits.site_domain_and_https()
+            form.save(request=request, use_https=https, domain_override=domain,
                       subject_template_name="emails/password_reset_subject.txt",
                       email_template_name="emails/password_reset.txt",
                       html_email_template_name="emails/password_reset.html")
@@ -455,7 +468,7 @@ class ConversationMessagesAPIView(APIView):
         from apps.messaging import services as dm
 
         conversation = _conversation(request, pk)
-        after = int(request.query_params.get("after") or 0)
+        after = int_param(request.query_params.get("after"), 0, minimum=0)
         if after:
             items = dm.messages_after(conversation, after)
         else:
@@ -500,7 +513,7 @@ class ReportAPIView(APIView):
         from apps.moderation import services as moderation
 
         run(moderation.submit_report, reporter=request.user, target_type=request.data.get("target_type", ""),
-            target_id=int(request.data.get("target_id") or 0), reason=request.data.get("reason", ""),
+            target_id=int_param(request.data.get("target_id"), 0), reason=request.data.get("reason", ""),
             details=request.data.get("details", ""))
         return Response({"detail": "Thanks. Moderators will review it."}, status=status.HTTP_201_CREATED)
 

@@ -8,6 +8,9 @@ from django.views.decorators.http import require_POST
 
 from . import services
 from .models import NotificationPreference, Category, Notification
+from django.urls import reverse
+
+from apps.core.net import safe_next
 
 PAGE = 30
 
@@ -35,7 +38,7 @@ def open_view(request, pk):
     item = get_object_or_404(Notification, pk=pk, recipient=request.user)
     if not item.is_read:
         services.mark_read(request.user, [item.pk])
-    target = item.url if url_has_allowed_host_and_scheme(item.url, {request.get_host()}) else "/"
+    target = safe_next(request, item.url, "/")
     return redirect(target)
 
 
@@ -44,7 +47,7 @@ def open_view(request, pk):
 def mark_all_view(request):
     services.mark_read(request.user)
     messages.success(request, "All caught up.")
-    return redirect(request.POST.get("next") or "notifications:list")
+    return redirect(safe_next(request, request.POST.get("next"), reverse("notifications:list")))
 
 
 PREF_FIELDS = [

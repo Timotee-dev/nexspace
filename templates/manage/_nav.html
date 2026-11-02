@@ -2,7 +2,7 @@
   <div><h1>Admin</h1><p class="muted small">{{ dept.name }} · {{ dept.faculty.university.short_name }}</p></div>
   {% if is_super and departments %}
   <form method="get" class="dept-switch"><label for="dept-switch" class="visually-hidden">Department</label>
-    <select id="dept-switch" name="dept" onchange="this.form.submit()">{% for d in departments %}<option value="{{ d.pk }}" {% if d.pk == dept.pk %}selected{% endif %}>{{ d.name }} ({{ d.faculty.university.short_name }})</option>{% endfor %}</select>
+    <select id="dept-switch" name="dept" data-autosubmit>{% for d in departments %}<option value="{{ d.pk }}" {% if d.pk == dept.pk %}selected{% endif %}>{{ d.name }} ({{ d.faculty.university.short_name }})</option>{% endfor %}</select>
     <noscript><button class="btn btn-ghost btn-sm">Switch</button></noscript>
   </form>
   {% endif %}

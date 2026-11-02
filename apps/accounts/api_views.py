@@ -26,8 +26,14 @@ class SignupAPIView(APIView):
 
     @extend_schema(request=SignupSerializer, responses={201: MeSerializer})
     def post(self, request):
+        from rest_framework.exceptions import Throttled
+
+        from . import limits
+
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if not limits.signup_allowed(request):
+            raise Throttled(detail="Too many accounts have been created from this connection. Try again later.")
         data = serializer.validated_data
         user = services.register_user(
             email=data["email"], password=data["password"], full_name=data["full_name"],
@@ -82,6 +88,10 @@ class ResendVerificationAPIView(APIView):
             return _error("already_verified", "Your email is already verified.", 400)
         if not cache.add(f"resend-verify:{request.user.pk}", 1, 60):
             return _error("throttled", "Wait a minute before requesting another email.", 429)
+        from . import limits
+
+        if not limits.verify_email_allowed(request.user):
+            return _error("throttled", "You've asked for a lot of codes today. Try again tomorrow.", 429)
         services.send_verification_email(request.user)
         return Response({"detail": "Verification email sent."}, status=status.HTTP_202_ACCEPTED)
 

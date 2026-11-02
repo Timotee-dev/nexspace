@@ -124,6 +124,24 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Security audit (v0.13)
+
+A full security review of the website and the app's API. Everything below has a test that tries the attack (`tests/test_security.py`), plus a sweep that opens every page with junk input (`tests/test_fuzz_all_pages.py`).
+
+- **Links in opportunities and study-group meetings** are checked everywhere (including the API): only `http`/`https`. Before, the API accepted `javascript:` "Apply" links that would run code for anyone who clicked them.
+- **Private things stay private:** the report page no longer previews messages or private-Space posts the person can't already see, and moderators can only act on a private message after someone in that chat has reported it.
+- **Real visitor address:** rate limits and sign-in lockouts use Cloudflare's `CF-Connecting-IP` (which can't be faked) instead of `X-Forwarded-For` (which can, on Render).
+- **Sign-in lockout** is per email *and* address: 5 wrong passwords lock that address out of that account; a stranger can no longer lock the real owner out. The `/django-admin/` login now goes through the same protected sign-in.
+- **Email limits** (protecting Brevo's 300/day): sign-ups 5 an hour per connection; password resets 3 an hour per email and 5 per connection; verification emails 10 a day per account. Reset links always use `SITE_URL`.
+- **6-digit codes:** each guess uses up an attempt *before* it is checked, so firing many guesses at once can't beat the 5-try limit.
+- **Push notifications** only go to real browser push services (Google, Mozilla, Apple, Microsoft), so the server can't be pointed at internal addresses.
+- **Upload bombs:** Word/PowerPoint "zip bombs", XML entity tricks, oversized images (over 64 MP, or 25 MP for PNG/WebP) and files over `COMPRESS_INPUT_MAX_MB` (50) when storage can't hold them are refused before they can use up the server's memory. Images that can't be processed are refused instead of being stored with their location data.
+- **Moderators** can't suspend or ban other moderators or admins (only department admins can act on moderators; nobody can act on the platform owner), and suspensions are 1–365 days.
+- **Browser protections:** a Content-Security-Policy (only NexSpace's own script files run — inline scripts and `onclick=` were removed), a Permissions-Policy (no camera, microphone, location or payments) and `Cache-Control: private` on signed-in pages. Set `CSP_REPORT_ONLY=true` on Render if a page ever misbehaves, to switch the policy to "report only" while it's fixed.
+- **Open redirects** fixed in every "next" link (`//evil`, `/\evil`, `javascript:`).
+- **DEBUG is off on Render** even if the `DEBUG` variable is missing.
+- Junk numbers and IDs in links never crash a page.
+
 ## Reading text in photos and scans — OCR (v0.12)
 
 - **Course materials can now be photos** (JPG, PNG, WebP) as well as PDF, Word and PowerPoint. Photos keep enough detail (2400 px) for their text to be read.

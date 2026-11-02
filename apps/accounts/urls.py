@@ -21,7 +21,7 @@ urlpatterns = [
     # Password reset (Django's secure token flow with NexSpace templates)
     path(
         "password-reset/",
-        auth_views.PasswordResetView.as_view(
+        views.LimitedPasswordResetView.as_view(
             template_name="accounts/password_reset.html",
             email_template_name="emails/password_reset.txt",
             html_email_template_name="emails/password_reset.html",

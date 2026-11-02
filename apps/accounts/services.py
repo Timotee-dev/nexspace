@@ -104,23 +104,30 @@ def issue_code(user, purpose) -> str:
 
 
 def check_code(user, purpose, code) -> bool:
-    """True (and the code is used up) if `code` is the user's current, unexpired code for `purpose`."""
+    """True (and the code is used up) if `code` is the user's current, unexpired code for `purpose`.
+
+    An attempt is used up *before* the code is compared, in one database update that only succeeds
+    while attempts are left. So firing many guesses at the same moment can't get more than 5 tries."""
     import hmac
+
+    from django.db.models import F
 
     from .models import EmailCode
 
     code = "".join(ch for ch in str(code or "") if ch.isdigit())
+    if len(code) != 6:
+        return False
     entry = (EmailCode.objects.filter(user=user, purpose=purpose, used_at__isnull=True,
                                       expires_at__gt=timezone.now()).order_by("-created_at").first())
-    if entry is None or entry.attempts >= CODE_MAX_ATTEMPTS or len(code) != 6:
-        if entry is not None and len(code) == 6:
-            EmailCode.objects.filter(pk=entry.pk).update(attempts=entry.attempts + 1)
+    if entry is None:
+        return False
+    claimed = EmailCode.objects.filter(pk=entry.pk, used_at__isnull=True,
+                                       attempts__lt=CODE_MAX_ATTEMPTS).update(attempts=F("attempts") + 1)
+    if not claimed:
         return False
     if not hmac.compare_digest(entry.code_hash, _hash_code(user, purpose, code)):
-        EmailCode.objects.filter(pk=entry.pk).update(attempts=entry.attempts + 1)
         return False
-    EmailCode.objects.filter(pk=entry.pk).update(used_at=timezone.now())
-    return True
+    return bool(EmailCode.objects.filter(pk=entry.pk, used_at__isnull=True).update(used_at=timezone.now()))
 
 
 def send_verification_email(user) -> None:

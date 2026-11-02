@@ -228,7 +228,7 @@ def test_push_subscription_api_and_delivery(settings, monkeypatch, run_hooks, al
                    format="json")
     assert bad.status_code == 400
     ok = api.post(reverse("api-push-subscriptions"),
-                  {"endpoint": "https://push.test/1", "keys": {"p256dh": "a", "auth": "b"}}, format="json")
+                  {"endpoint": "https://fcm.googleapis.com/fcm/send/1", "keys": {"p256dh": "a", "auth": "b"}}, format="json")
     assert ok.status_code == 201 and PushSubscription.objects.filter(user=alice).count() == 1
 
     settings.PUSH_ENABLED = True

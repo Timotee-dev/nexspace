@@ -3,10 +3,11 @@ from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.views import PasswordResetView
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -14,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from apps.core import ratelimit
 
-from . import services
+from . import limits, services
 from .forms import AppearanceForm, InterestsForm, LevelForm, LoginForm, PrivacyForm, ProfileForm, SignupForm
 from .models import User
 
@@ -22,17 +23,18 @@ RESEND_COOLDOWN_SECONDS = 60
 
 
 def _safe_next(request, fallback):
-    target = request.POST.get("next") or request.GET.get("next")
-    if target and url_has_allowed_host_and_scheme(target, {request.get_host()}, request.is_secure()):
-        return target
-    return fallback
+    from apps.core.net import safe_next
+
+    return safe_next(request, request.POST.get("next") or request.GET.get("next"), fallback)
 
 
 def signup_view(request):
     if request.user.is_authenticated:
         return redirect("core:home")
     form = SignupForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    if request.method == "POST" and form.is_valid() and not limits.signup_allowed(request):
+        form.add_error(None, "Too many accounts have been created from this connection. Try again later.")
+    elif request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         if data["account_type"] == "staff":
             user = services.register_staff(
@@ -118,6 +120,8 @@ def resend_verification_view(request):
         messages.info(request, "Your email is already verified.")
     elif not cache.add(f"resend-verify:{user.pk}", 1, RESEND_COOLDOWN_SECONDS):
         messages.error(request, "A code was sent less than a minute ago. Check your inbox and spam folder.")
+    elif not limits.verify_email_allowed(user):
+        messages.error(request, "You've asked for a lot of codes today. Use the newest email, or try again tomorrow.")
     else:
         services.send_verification_email(user)
         messages.success(request, f"We sent a new 6-digit code to {user.email}.")
@@ -379,3 +383,22 @@ def _has_blocked(user, other):
     from apps.messaging.services import has_blocked
 
     return has_blocked(user, other)
+
+
+
+class LimitedPasswordResetView(PasswordResetView):
+    """Django's reset flow, with limits per address and per email, and links that always use SITE_URL
+    (never the Host header of the request, which an attacker could choose)."""
+
+    def form_valid(self, form):
+        email = form.cleaned_data.get("email", "")
+        if limits.reset_allowed(self.request, email):
+            domain, https = limits.site_domain_and_https()
+            form.save(
+                domain_override=domain, use_https=https if domain else self.request.is_secure(),
+                token_generator=self.token_generator, from_email=self.from_email,
+                email_template_name=self.email_template_name, subject_template_name=self.subject_template_name,
+                html_email_template_name=self.html_email_template_name, request=self.request,
+                extra_email_context=self.extra_email_context,
+            )
+        return HttpResponseRedirect(self.get_success_url())  # same page either way: reveals nothing

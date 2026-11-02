@@ -47,8 +47,10 @@ class PushSubscriptionSerializer(serializers.Serializer):
     keys = serializers.DictField(child=serializers.CharField(max_length=200))
 
     def validate_endpoint(self, value):
-        if not value.startswith("https://"):
-            raise serializers.ValidationError("Push endpoints must use HTTPS.")
+        from .webpush import is_push_service
+
+        if not is_push_service(value):
+            raise serializers.ValidationError("That isn't a browser push service address.")
         return value
 
     def validate_keys(self, value):

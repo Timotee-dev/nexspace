@@ -33,7 +33,7 @@
     </form>
   </details>
   {% endif %}
-  {% if invite_url and not group.is_open %}<p class="small">Invite link: <input class="copy-input" readonly value="{{ invite_url }}" aria-label="Invite link" onclick="this.select()"></p>{% endif %}
+  {% if invite_url and not group.is_open %}<p class="small">Invite link: <input class="copy-input" readonly value="{{ invite_url }}" aria-label="Invite link" data-select-on-click></p>{% endif %}
 </section>
 
 {% if is_member %}

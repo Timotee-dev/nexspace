@@ -1,5 +1,5 @@
 {% load static %}<!doctype html>
-<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ theme_preference }}{% else %}system{% endif %}">
+<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ theme_preference }}{% else %}system{% endif %}" data-guest="{% if user.is_authenticated %}false{% else %}true{% endif %}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,15 +7,7 @@
   <meta name="description" content="{% block description %}NexSpace is the digital home of your department: classmates, course materials, announcements and opportunities in one place.{% endblock %}">
   {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
   <meta name="theme-color" content="#121a2e">
-  <script>
-    (function () {
-      var root = document.documentElement, pref = root.dataset.themePref;
-      {% if not user.is_authenticated %}try { pref = localStorage.getItem("nexspace-theme") || pref; } catch (e) {}{% endif %}
-      root.dataset.themePref = pref;
-      root.dataset.theme = (pref === "light" || pref === "dark") ? pref
-        : (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    })();
-  </script>
+  <script src="{% static 'js/theme.js' %}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">

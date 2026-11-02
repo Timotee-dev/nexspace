@@ -3,7 +3,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
 
-from apps.posts.services import COMMENT_RATE, _limit, require_verified
+from apps.posts.services import _safe_link, COMMENT_RATE, _limit, require_verified
 
 from .models import StudyGroup, StudyGroupMembership, StudyGroupMessage
 
@@ -30,7 +30,7 @@ def create_group(*, user, name, description="", course=None, is_open=True, next_
     group = StudyGroup.objects.create(
         department_id=user.department_id, name=name[:80], description=(description or "")[:300], course=course,
         is_open=is_open, next_meeting_at=next_meeting_at, meeting_location=meeting_location[:150],
-        meeting_link=meeting_link, created_by=user, member_count=1,
+        meeting_link=_safe_link(meeting_link, "meeting link"), created_by=user, member_count=1,
     )
     StudyGroupMembership.objects.create(group=group, user=user, is_admin=True)
     return group
@@ -77,7 +77,8 @@ def update_meeting(*, user, group, next_meeting_at, meeting_location="", meeting
         raise PermissionDenied("Only group admins can change the meeting.")
     if next_meeting_at and next_meeting_at < timezone.now():
         raise ValidationError("The next meeting must be in the future.")
-    group.next_meeting_at, group.meeting_location, group.meeting_link = next_meeting_at, meeting_location[:150], meeting_link
+    group.next_meeting_at, group.meeting_location, group.meeting_link = (
+        next_meeting_at, meeting_location[:150], _safe_link(meeting_link, "meeting link"))
     group.save(update_fields=["next_meeting_at", "meeting_location", "meeting_link"])
     from apps.notifications import services as notifications
     from apps.notifications.models import Category, Notification

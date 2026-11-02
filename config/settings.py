@@ -22,7 +22,10 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-DEBUG = env_bool("DEBUG", True)
+# On Render (which always sets RENDER=true) DEBUG is off unless explicitly turned on, so a missing
+# variable can never expose debug pages in production.
+ON_RENDER = bool(os.environ.get("RENDER"))
+DEBUG = env_bool("DEBUG", not ON_RENDER)
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
     if not DEBUG:
@@ -79,6 +82,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.accounts.middleware.OnboardingMiddleware",
     "apps.accounts.middleware.LastSeenMiddleware",
+    "apps.core.middleware.SecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -211,8 +215,8 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.api.exception_handler",
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "apps.core.throttles.AnonRateThrottle",   # keyed on the real visitor address, not X-Forwarded-For
+        "apps.core.throttles.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "user": "240/min", "auth": "10/min"},
 }
@@ -220,7 +224,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.12.1",
+    "VERSION": "0.13.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",
@@ -235,6 +239,11 @@ SESSION_COOKIE_SAMESITE = "Lax"
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
+# Content-Security-Policy (apps/core/middleware.py). Set CSP_REPORT_ONLY=true to only log problems.
+CSP_REPORT_ONLY = env_bool("CSP_REPORT_ONLY", False)
+# Uploads bigger than this aren't opened for compressing (protects the 512 MB server's memory);
+# with Cloudinary's 10 MB limit a file over 50 MB would almost never shrink enough anyway.
+COMPRESS_INPUT_MAX_MB = int(os.environ.get("COMPRESS_INPUT_MAX_MB", "50"))
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

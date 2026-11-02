@@ -135,8 +135,8 @@ def test_password_reset_flow(client, user):
     r = client.post(reverse("accounts:password-reset"), {"email": user.email})
     assert r.status_code == 302
     assert len(mail.outbox) == 1
-    link = re.search(r"http://\S+/password-reset/\S+/\S+/", mail.outbox[0].body).group(0)
-    path = link.split("testserver")[1]
+    link = re.search(r"https?://\S+/password-reset/\S+/\S+/", mail.outbox[0].body).group(0)
+    path = "/password-reset/" + link.split("/password-reset/", 1)[1]  # the link uses SITE_URL
     r = client.get(path, follow=True)
     form_url = r.redirect_chain[-1][0]
     r = client.post(form_url, {"new_password1": "An0ther-str0ng-one", "new_password2": "An0ther-str0ng-one"})

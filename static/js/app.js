@@ -595,3 +595,13 @@ document.querySelectorAll("[data-people-picker]").forEach((picker) => {
     if (none) none.hidden = shown > 0;
   });
 });
+
+// ---------- Small behaviours (instead of inline onchange/onclick, which the CSP blocks) ----------
+document.addEventListener("change", (event) => {
+  const field = event.target.closest("[data-autosubmit]");
+  if (field && field.form) field.form.requestSubmit ? field.form.requestSubmit() : field.form.submit();
+});
+document.addEventListener("click", (event) => {
+  const field = event.target.closest("[data-select-on-click]");
+  if (field) field.select();
+});

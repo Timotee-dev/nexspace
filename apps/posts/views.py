@@ -305,7 +305,7 @@ def edit_post_view(request, pk):
     error = None
     if request.method == "POST":
         try:
-            chosen = topics.filter(pk__in=request.POST.getlist("topics"))
+            chosen = topics.filter(pk__in=[t for t in request.POST.getlist("topics") if t.isdigit()])
             services.edit_post(user=request.user, post=post, body=request.POST.get("body", ""),
                                title=request.POST.get("title") if "title" in request.POST else None, topics=chosen)
         except (ValidationError, PermissionDenied) as exc:

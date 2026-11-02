@@ -27,6 +27,7 @@ from apps.spaces.models import Space
 from apps.topics.models import Topic
 
 from . import analytics
+from apps.core.net import safe_next
 
 
 # --- Access ----------------------------------------------------------------------
@@ -44,7 +45,7 @@ def admin_required(view):
         if settings.ADMIN_AREA == "owner" and not user.is_platform_admin:
             return _admin_sign_in(request)  # only the platform owner may use the admin pages
         department = user.department
-        if user.is_platform_admin and request.GET.get("dept"):
+        if user.is_platform_admin and request.GET.get("dept", "").isdigit():
             department = get_object_or_404(Department, pk=request.GET["dept"])
             request.session["manage_dept"] = department.pk
         elif user.is_platform_admin and request.session.get("manage_dept"):
@@ -197,7 +198,7 @@ def user_action_view(request, pk):
             audit(request.user, "user.email_verified_manually", member)
             messages.success(request, "Email marked as verified.")
         elif action == "suspend":
-            moderation.suspend_user(moderator=request.user, user=member, days=int(request.POST.get("days", 7)),
+            moderation.suspend_user(moderator=request.user, user=member, days=request.POST.get("days", 7),
                                     note=request.POST.get("note", ""))
             messages.success(request, "Account suspended.")
         elif action == "unsuspend":
@@ -443,7 +444,7 @@ def staff_decision_view(request, pk):
 
         picked = None
         if staff.position == "lecturer" and "courses_submitted" in request.POST:
-            picked = list(Course.objects.filter(pk__in=request.POST.getlist("courses"),
+            picked = list(Course.objects.filter(pk__in=[c for c in request.POST.getlist("courses") if c.isdigit()],
                                                 department=staff.user.department))
         verify_staff(admin=request.user, staff=staff, approve=approve, note=request.POST.get("note", ""),
                      courses=picked)
@@ -461,9 +462,7 @@ def admin_sign_in_view(request):
 
     from apps.core import ratelimit
 
-    next_url = request.GET.get("next") or request.POST.get("next") or reverse("manage:overview")
-    if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = reverse("manage:overview")
+    next_url = safe_next(request, request.GET.get("next") or request.POST.get("next"), reverse("manage:overview"))
     if request.user.is_authenticated and request.user.is_platform_admin:
         return redirect(next_url)
     error = None

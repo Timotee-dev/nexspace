@@ -77,6 +77,8 @@ def encrypt(payload: bytes, p256dh_b64: str, auth_b64: str, *, salt: bytes = Non
 
 
 def send(subscription, data: dict, *, public_b64, private_b64, subject, ttl=24 * 3600, urgency="normal") -> int:
+    if not is_push_service(subscription.endpoint):  # also covers anything saved before this check existed
+        return 410  # treated as gone, so the subscription is removed
     body = encrypt(json.dumps(data).encode(), subscription.p256dh, subscription.auth)
     request = urllib.request.Request(subscription.endpoint, data=body, method="POST", headers={
         "Authorization": vapid_header(subscription.endpoint, public_b64, private_b64, subject),
@@ -88,3 +90,26 @@ def send(subscription, data: dict, *, public_b64, private_b64, subject, ttl=24 *
             return response.status
     except urllib.error.HTTPError as exc:
         return exc.code
+
+
+# Browsers only ever give out push addresses on these services. Accepting anything else would let
+# someone make the server send requests to addresses of their choosing (including internal ones).
+PUSH_SERVICE_HOSTS = (
+    "fcm.googleapis.com",            # Chrome, Edge (Chromium), Brave, Opera, Samsung Internet
+    "updates.push.services.mozilla.com", "push.services.mozilla.com",  # Firefox
+    "web.push.apple.com", "api.push.apple.com",                        # Safari (macOS, iOS)
+    ".notify.windows.com",           # legacy Edge (wns2-*.notify.windows.com)
+)
+
+
+def is_push_service(endpoint: str) -> bool:
+    from urllib.parse import urlparse
+
+    try:
+        url = urlparse(endpoint)
+    except ValueError:
+        return False
+    host = (url.hostname or "").lower()
+    if url.scheme != "https" or not host or url.port not in (None, 443) or url.username or url.password:
+        return False
+    return any(host == h.lstrip(".") or (h.startswith(".") and host.endswith(h)) for h in PUSH_SERVICE_HOSTS)

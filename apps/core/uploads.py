@@ -10,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_FORMATS = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}
+MAX_FULL_DECODE_PIXELS = 25_000_000   # PNG/WebP are decoded in full: ~100 MB of memory at this size
 
 
 def post_file_upload_path(instance, filename):
@@ -30,10 +31,18 @@ def validate_image_upload(file):
         position = file.tell()
         with Image.open(file) as image:
             image_format = image.format
+            width, height = image.size
             image.verify()
         file.seek(position)
-    except (UnidentifiedImageError, OSError):
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise ValidationError("That image is too large in pixels. Resize it and try again.")
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
         raise ValidationError("Upload a JPEG, PNG or WebP image.")
+    if width * height > Image.MAX_IMAGE_PIXELS:
+        raise ValidationError("That image is too large in pixels. Resize it and try again.")
+    # JPEGs are decoded at reduced size (cheap). Other formats are decoded in full, so keep them smaller.
+    if image_format != "JPEG" and width * height > MAX_FULL_DECODE_PIXELS:
+        raise ValidationError("That image is too large in pixels. Save it as a JPEG or resize it, then try again.")
     if image_format not in ALLOWED_IMAGE_FORMATS:
         raise ValidationError("Upload a JPEG, PNG or WebP image.")
     ext = os.path.splitext(file.name)[1].lower()
@@ -69,8 +78,9 @@ def _detect_document(file) -> str | None:
         if head.startswith(b"PK\x03\x04"):
             try:
                 with zipfile.ZipFile(file) as archive:
+                    check_archive(archive)
                     names = set(archive.namelist())
-            except zipfile.BadZipFile:
+            except (zipfile.BadZipFile, UnsafeArchive):
                 return None
             if "word/document.xml" in names:
                 return ".docx"
@@ -124,12 +134,14 @@ def optimize_image(file, max_edge=None):
     from django.core.files.uploadedfile import InMemoryUploadedFile
     from PIL import ImageOps
 
+    edge = max_edge or settings.IMAGE_MAX_EDGE
     try:
         file.seek(0)
         with Image.open(file) as image:
             fmt = image.format
+            if fmt == "JPEG":
+                image.draft("RGB", (edge, edge))  # decode straight to (about) the final size: little memory
             image = ImageOps.exif_transpose(image)
-            edge = max_edge or settings.IMAGE_MAX_EDGE
             image.thumbnail((edge, edge))
             if fmt == "JPEG" and image.mode not in ("RGB", "L"):
                 image = image.convert("RGB")
@@ -138,8 +150,9 @@ def optimize_image(file, max_edge=None):
                        "PNG": {"optimize": True}, "WEBP": {"quality": 85}}[fmt]
             image.save(buffer, fmt, **options)  # a fresh save carries no EXIF
     except Exception:
-        file.seek(0)
-        return file
+        # Never store the original instead: it would keep its location data (EXIF/GPS).
+        logger.warning("Couldn't process image %s", getattr(file, "name", ""), exc_info=True)
+        raise ValidationError("That image couldn't be processed. Try saving it again as a JPEG.")
     buffer.seek(0)
     content_type = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}[fmt]
     return InMemoryUploadedFile(buffer, "file", file.name, content_type, buffer.getbuffer().nbytes, None)
@@ -215,6 +228,37 @@ def _compress_pdf(file) -> bytes | None:
     return out.getvalue()
 
 
+# Word/PowerPoint files are zip archives. A "zip bomb" is a tiny archive that expands to gigabytes;
+# these limits stop NexSpace from ever unpacking more than a sensible amount.
+ZIP_MAX_ENTRIES = 5000
+ZIP_MAX_ENTRY_BYTES = 60 * 1024 * 1024
+ZIP_MAX_TOTAL_BYTES = 250 * 1024 * 1024
+
+
+class UnsafeArchive(ValueError):
+    pass
+
+
+def check_archive(archive):
+    """Reject archives that claim too many files or too much unpacked data (before reading any of it)."""
+    items = archive.infolist()
+    if len(items) > ZIP_MAX_ENTRIES:
+        raise UnsafeArchive("too many files inside")
+    if sum(i.file_size for i in items) > ZIP_MAX_TOTAL_BYTES:
+        raise UnsafeArchive("unpacks too large")
+    return items
+
+
+def read_zip_entry(archive, name, limit=ZIP_MAX_ENTRY_BYTES) -> bytes:
+    """Read one file from an archive, stopping as soon as it goes over `limit` (the sizes written inside
+    an archive can lie, so this counts what actually comes out)."""
+    with archive.open(name) as handle:
+        data = handle.read(limit + 1)
+    if len(data) > limit:
+        raise UnsafeArchive(f"{name} unpacks too large")
+    return data
+
+
 def _compress_office(file) -> bytes:
     """Word/PowerPoint files are zip archives: recompress their pictures and repack tightly."""
     import zipfile
@@ -223,8 +267,12 @@ def _compress_office(file) -> bytes:
     file.seek(0)
     out = BytesIO()
     with zipfile.ZipFile(file) as src, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
-        for item in src.infolist():
-            data = src.read(item.filename)
+        total = 0
+        for item in check_archive(src):
+            data = read_zip_entry(src, item.filename)
+            total += len(data)
+            if total > ZIP_MAX_TOTAL_BYTES:
+                raise UnsafeArchive("unpacks too large")
             lower = item.filename.lower()
             if "/media/" in lower and len(data) > 150 * 1024:
                 if lower.endswith((".jpg", ".jpeg")):
@@ -239,6 +287,14 @@ def compress_document(file, content_type):
     """Return a smaller copy of a big PDF/Word/PowerPoint file, or the original if it can't be shrunk."""
     if file.size <= COMPRESS_OVER:
         return file
+    limit = settings.STORAGE_FILE_LIMIT_BYTES
+    if limit and file.size > settings.COMPRESS_INPUT_MAX_MB * 1024 * 1024 and file.size > limit:
+        # Opening a file this big would use too much of the server's memory, and it would almost
+        # never shrink below the storage limit anyway.
+        raise ValidationError(
+            f"{file.name} is {_mb(file.size)}. Files over {settings.COMPRESS_INPUT_MAX_MB} MB can't be stored here; "
+            f"the limit after compressing is {settings.STORAGE_FILE_LIMIT_MB} MB. Try splitting it into smaller parts."
+        )
     ext = os.path.splitext(file.name)[1].lower()
     try:
         if ext == ".pdf":

@@ -18,6 +18,9 @@ from apps.topics.models import Topic
 
 from . import services
 from .models import OpportunityReminder
+from django.urls import reverse
+
+from apps.core.net import safe_next
 
 
 @login_required
@@ -84,4 +87,4 @@ def reminder_view(request, pk):
             messages.success(request, f"We'll remind you on {reminder.remind_on:%d %b}.")
         except (ValidationError, ValueError, TypeError) as exc:
             messages.error(request, " ".join(getattr(exc, "messages", [str(exc)])))
-    return redirect(request.POST.get("next") or "discover:opportunities")
+    return redirect(safe_next(request, request.POST.get("next"), reverse("discover:opportunities")))

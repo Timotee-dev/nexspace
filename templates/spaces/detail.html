@@ -76,7 +76,7 @@
       <label for="res-q" class="visually-hidden">Search materials</label>
       <input id="res-q" type="search" name="q" value="{{ q }}" placeholder="e.g. sorting, 2023">
       <label for="res-sort" class="visually-hidden">Sort</label>
-      <select id="res-sort" name="sort" onchange="this.form.submit()">
+      <select id="res-sort" name="sort" data-autosubmit>
         <option value="useful" {% if sort == "useful" %}selected{% endif %}>Most useful</option>
         <option value="downloads" {% if sort == "downloads" %}selected{% endif %}>Most downloaded</option>
         <option value="recent" {% if sort == "recent" %}selected{% endif %}>Most recent</option>

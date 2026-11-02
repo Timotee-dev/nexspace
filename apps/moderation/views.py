@@ -10,6 +10,7 @@ from apps.posts.models import Post
 
 from . import services
 from .models import ModerationAction, Report, TargetType
+from apps.core.net import safe_next
 
 
 def _require_mod(user):
@@ -26,8 +27,8 @@ def report_view(request, target_type, target_id):
     if target_type not in TargetType.values:
         raise Http404
     obj = services.load_target(target_type, target_id)
-    if obj is None or services.target_department_id(target_type, obj) != request.user.department_id:
-        raise Http404
+    if not services.can_see_target(request.user, target_type, obj):
+        raise Http404  # never preview content the person couldn't already see
     if request.method == "POST":
         try:
             services.submit_report(reporter=request.user, target_type=target_type, target_id=obj.pk,
@@ -36,10 +37,10 @@ def report_view(request, target_type, target_id):
             messages.error(request, _err(exc))
         else:
             messages.success(request, "Thanks. Moderators will review your report. The person you reported won't see who reported them.")
-            return redirect(request.POST.get("next") or "/")
+            return redirect(safe_next(request, request.POST.get("next"), "/"))
     return render(request, "moderation/report.html", {
         "target_type": target_type, "label": services.label(target_type, obj),
-        "reasons": Report.Reason.choices, "next": request.GET.get("next", "/"),
+        "reasons": Report.Reason.choices, "next": safe_next(request, request.GET.get("next"), "/"),
     })
 
 
@@ -72,7 +73,7 @@ def action_view(request):
         elif action in ("suspend", "ban", "unsuspend"):
             user = get_object_or_404(User, pk=request.POST.get("user_id"), department_id=request.user.department_id)
             if action == "suspend":
-                services.suspend_user(moderator=request.user, user=user, days=int(request.POST.get("days", 7)), note=note)
+                services.suspend_user(moderator=request.user, user=user, days=request.POST.get("days", 7), note=note)
                 messages.success(request, f"{user.full_name} is suspended.")
             elif action == "unsuspend":
                 services.unsuspend_user(moderator=request.user, user=user)

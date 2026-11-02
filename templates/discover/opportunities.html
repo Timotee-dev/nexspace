@@ -25,7 +25,7 @@
       <form method="post" action="{% url 'discover:remind' post.pk %}" class="remind-form">
         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
         <label class="visually-hidden" for="remind-{{ post.pk }}">Remind me</label>
-        <select id="remind-{{ post.pk }}" name="days" onchange="this.form.submit()">
+        <select id="remind-{{ post.pk }}" name="days" data-autosubmit>
           <option value="" {% if not post.reminder_days %}selected{% endif %} disabled>Remind me…</option>
           {% for d in reminder_choices %}<option value="{{ d }}" {% if post.reminder_days == d %}selected{% endif %}>{{ d }} day{{ d|pluralize }} before</option>{% endfor %}
           {% if post.reminder_days %}<option value="off">No reminder</option>{% endif %}

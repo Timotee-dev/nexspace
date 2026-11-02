@@ -13,6 +13,9 @@ from apps.posts.services import RateLimited
 
 from . import services
 from .models import GROUP_MAX_MEMBERS, Conversation, ConversationMember, Message, MessageAttachment
+from django.urls import reverse
+
+from apps.core.net import digits, int_param, safe_next
 
 
 def _err(exc):
@@ -112,7 +115,7 @@ def send_view(request, pk):
 def poll_view(request, pk):
     """New messages since `after` (and which earlier ones were deleted), for the live chat."""
     conversation = _conversation(request, pk)
-    after = int(request.GET.get("after", "0") or 0)
+    after = int_param(request.GET.get("after"), 0, minimum=0)
     new = services.messages_after(conversation, after)
     if new:
         services.mark_read(request.user, conversation)
@@ -178,7 +181,7 @@ def block_user_view(request, username):
             flash.success(request, f"You blocked {other.full_name}. Neither of you can message the other.")
         except ValidationError as exc:
             flash.error(request, _err(exc))
-    return redirect(request.POST.get("next") or "messaging:inbox")
+    return redirect(safe_next(request, request.POST.get("next"), reverse("messaging:inbox")))
 
 
 @login_required
@@ -223,7 +226,7 @@ def _pickable_people(user, exclude_ids=()):
 def new_group_view(request):
     error = None
     if request.method == "POST":
-        chosen = User.objects.filter(pk__in=request.POST.getlist("members"), department_id=request.user.department_id)
+        chosen = User.objects.filter(pk__in=digits(request.POST.getlist("members")), department_id=request.user.department_id)
         try:
             group = services.create_group(creator=request.user, title=request.POST.get("title", ""), members=list(chosen))
         except (PermissionDenied, ValidationError) as exc:
@@ -234,7 +237,7 @@ def new_group_view(request):
             return redirect(group.get_absolute_url())
     return render(request, "messaging/new_group.html", {
         "people": _pickable_people(request.user), "error": error, "max": GROUP_MAX_MEMBERS,
-        "chosen": set(map(str, request.POST.getlist("members"))), "title": request.POST.get("title", ""),
+        "chosen": set(map(str, digits(request.POST.getlist("members")))), "title": request.POST.get("title", ""),
     })
 
 
@@ -252,7 +255,7 @@ def group_view(request, pk):
                 services.rename_group(actor=request.user, group=conversation, title=request.POST.get("title", ""))
                 flash.success(request, "Group renamed.")
             elif action == "add":
-                people = list(User.objects.filter(pk__in=request.POST.getlist("members"),
+                people = list(User.objects.filter(pk__in=digits(request.POST.getlist("members")),
                                                   department_id=request.user.department_id))
                 added = services.add_members(actor=request.user, group=conversation, people=people)
                 flash.success(request, f"Added {len(added)} {'person' if len(added) == 1 else 'people'}.")

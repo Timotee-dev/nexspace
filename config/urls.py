@@ -25,8 +25,21 @@ api_patterns = [
     path("", include(search_api)),
 ]
 
+def _admin_login(request):
+    """Django's own admin login has no lockout, so send it to NexSpace's rate-limited sign-in page."""
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    from django.utils.http import urlencode
+
+    from apps.core.net import safe_next
+
+    target = safe_next(request, request.GET.get("next"), "/django-admin/")
+    return redirect(f"{reverse('accounts:login')}?{urlencode({'next': target})}")
+
+
 urlpatterns = [
     path("admin/", RedirectView.as_view(url="/manage/", permanent=False)),  # people naturally type /admin
+    path("django-admin/login/", _admin_login),
     path("django-admin/", admin.site.urls),
     path("api/m/", include("apps.mobile.urls")),
     path("api/", include(api_patterns)),

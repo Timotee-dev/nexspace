@@ -1,46 +1,62 @@
-"""Cache-backed login attempt limiter (brute-force protection, spec Section 8)."""
+"""Cache-backed limits: sign-in brute-force protection and simple per-key rate limits.
+
+Sign-in lockout works on three counters (15 minutes each):
+- this email from this address: 5 wrong passwords, then that address is locked out of that account;
+- this address, any email: 20 wrong passwords (someone trying many accounts);
+- this email from anywhere: 50 wrong passwords (a guessing attack spread over many addresses).
+A stranger can therefore no longer lock the real owner out with 5 wrong tries from their own phone;
+they would need 50, and the owner can still reset their password by email.
+"""
 from django.conf import settings
 from django.core.cache import cache
 
+from .net import client_ip  # noqa: F401 (re-exported)
 
-def _client_ip(request) -> str:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    return forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR", "")
+PER_IP_ANY_EMAIL = 4      # x LOGIN_MAX_FAILURES
+PER_EMAIL_ANYWHERE = 10   # x LOGIN_MAX_FAILURES
 
 
-def _keys(request, email: str) -> list[str]:
-    email = (email or "").strip().lower()
-    return [f"login-fail:email:{email}", f"login-fail:ip:{_client_ip(request)}"]
+def _client_ip(request) -> str:  # kept for older imports
+    return client_ip(request)
+
+
+def _keys(request, email: str) -> dict:
+    email = (email or "").strip().lower()[:254]
+    ip = client_ip(request)
+    return {
+        "pair": (f"login-fail:pair:{email}:{ip}", settings.LOGIN_MAX_FAILURES),
+        "ip": (f"login-fail:ip:{ip}", settings.LOGIN_MAX_FAILURES * PER_IP_ANY_EMAIL),
+        "email": (f"login-fail:email:{email}", settings.LOGIN_MAX_FAILURES * PER_EMAIL_ANYWHERE),
+    }
 
 
 def is_locked(request, email: str) -> bool:
-    email_key, ip_key = _keys(request, email)
-    return (
-        cache.get(email_key, 0) >= settings.LOGIN_MAX_FAILURES
-        or cache.get(ip_key, 0) >= settings.LOGIN_MAX_FAILURES * 4
-    )
+    return any(cache.get(key, 0) >= limit for key, limit in _keys(request, email).values())
+
+
+def _incr(key, window):
+    if cache.add(key, 1, window):
+        return 1
+    try:
+        return cache.incr(key)
+    except ValueError:  # expired between add and incr
+        cache.set(key, 1, window)
+        return 1
 
 
 def record_failure(request, email: str) -> None:
-    for key in _keys(request, email):
-        cache.add(key, 0, settings.LOGIN_LOCKOUT_SECONDS)
-        try:
-            cache.incr(key)
-        except ValueError:
-            cache.set(key, 1, settings.LOGIN_LOCKOUT_SECONDS)
+    for key, _ in _keys(request, email).values():
+        _incr(key, settings.LOGIN_LOCKOUT_SECONDS)
 
 
 def clear_failures(request, email: str) -> None:
-    cache.delete(_keys(request, email)[0])
+    cache.delete(_keys(request, email)["pair"][0])
 
 
 def allow(key: str, limit: int, window_seconds: int) -> bool:
     """Generic fixed-window limiter. Returns False once `limit` hits occur in the window."""
-    cache_key = f"rl:{key}"
-    cache.add(cache_key, 0, window_seconds)
-    try:
-        count = cache.incr(cache_key)
-    except ValueError:
-        cache.set(cache_key, 1, window_seconds)
-        count = 1
-    return count <= limit
+    return _incr(f"rl:{key}", window_seconds) <= limit
+
+
+def allow_ip(request, action: str, limit: int, window_seconds: int) -> bool:
+    return allow(f"{action}:ip:{client_ip(request)}", limit, window_seconds)

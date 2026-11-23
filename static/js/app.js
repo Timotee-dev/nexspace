@@ -42,6 +42,7 @@ export function toast(message, level = "info") {
   item.append(text, closeButton());
   region.append(item);
   autoDismiss(item);
+  return item;
 }
 
 function closeButton() {
@@ -129,14 +130,83 @@ export function tooBigToSend(files) {
   return total > maxRequestMb * 1024 * 1024;
 }
 const tooBigMessage = () => `Files are too big to send together (max ${maxRequestMb} MB in total). Send fewer or smaller files.`;
-document.addEventListener("submit", (event) => {
+
+// ---------- Direct uploads: files go straight to Cloudinary, then the form is sent with a short token ----------
+// (Skips Vercel's 4.5 MB request limit. The server turns each token back into a normal upload and checks it.)
+export const directUploads = document.body.dataset.directUpload === "1";
+const maxFileMb = Number(document.body.dataset.maxDocMb || 10);
+const DIRECT_PREFIX = "__direct__";
+
+export async function uploadDirect(file) {
+  if (file.size > maxFileMb * 1024 * 1024) throw new Error(`${file.name} is too big. Files can be up to ${maxFileMb} MB.`);
+  const permit = await api("/uploads/sign/", { method: "POST", body: { name: file.name, size: file.size, type: file.type } });
+  const data = new FormData();
+  Object.entries(permit.fields).forEach(([key, value]) => data.append(key, value));
+  data.append("file", file);
+  let response;
+  try {
+    response = await fetch(permit.url, { method: "POST", body: data });
+  } catch {
+    throw new Error(`${file.name} didn't upload. Check your connection and try again.`);
+  }
+  if (!response.ok) throw new Error(`${file.name} didn't upload. Try again.`);
+  return permit.token;
+}
+
+const pickedInputs = (form) => [...form.querySelectorAll('input[type="file"]')]
+  .filter((input) => input.name && !input.disabled && input.files && input.files.length);
+
+function resetDirect(form) {
+  form.querySelectorAll(`input[type="hidden"][name^="${DIRECT_PREFIX}"]`).forEach((el) => el.remove());
+  form.querySelectorAll("input[type=file][data-direct-sent]").forEach((input) => {
+    input.disabled = false;
+    delete input.dataset.directSent;
+  });
+}
+
+document.addEventListener("submit", async (event) => {
   const form = event.target;
-  if (!maxRequestMb || !(form instanceof HTMLFormElement)) return;
-  const files = [...form.querySelectorAll('input[type="file"]')].flatMap((i) => [...(i.files || [])]);
-  if (files.length && tooBigToSend(files)) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    toast(tooBigMessage(), "error");
+  if (!(form instanceof HTMLFormElement)) return;
+  const inputs = pickedInputs(form);
+  if (!inputs.length) return;
+  if (!directUploads) {  // files travel with the form: keep the whole request under Vercel's limit
+    if (tooBigToSend(inputs.flatMap((i) => [...i.files]))) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toast(tooBigMessage(), "error");
+    }
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (form.dataset.uploading) return;
+  const files = inputs.flatMap((input) => [...input.files].map((file) => ({ input, file })));
+  const tooBig = files.find(({ file }) => file.size > maxFileMb * 1024 * 1024);
+  if (tooBig) { toast(`${tooBig.file.name} is too big. Files can be up to ${maxFileMb} MB.`, "error"); return; }
+  const submitter = event.submitter;
+  form.dataset.uploading = "1";
+  submitter?.setAttribute("aria-busy", "true");
+  const note = toast(files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…");
+  try {
+    const tokens = await Promise.all(files.map(({ file }) => uploadDirect(file)));
+    tokens.forEach((token, i) => {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = DIRECT_PREFIX + files[i].input.name;
+      hidden.value = token;
+      form.append(hidden);
+    });
+    inputs.forEach((input) => { input.disabled = true; input.dataset.directSent = "1"; });  // send tokens, not bytes
+    note?.remove?.();
+    delete form.dataset.uploading;
+    submitter?.removeAttribute("aria-busy");
+    if (submitter && form.contains(submitter)) form.requestSubmit(submitter); else form.requestSubmit();
+  } catch (err) {
+    resetDirect(form);
+    note?.remove?.();
+    toast(err.message || "Upload failed. Try again.", "error");
+    delete form.dataset.uploading;
+    submitter?.removeAttribute("aria-busy");
   }
 }, true);
 
@@ -150,9 +220,10 @@ document.addEventListener("submit", (event) => {
     setTimeout(() => { if (!event.defaultPrevented) submitter.setAttribute("aria-busy", "true"); }, 0);
   }
 });
-window.addEventListener("pageshow", () =>
-  document.querySelectorAll('[aria-busy="true"]').forEach((b) => b.removeAttribute("aria-busy"))
-);
+window.addEventListener("pageshow", () => {
+  document.querySelectorAll('[aria-busy="true"]').forEach((b) => b.removeAttribute("aria-busy"));
+  document.querySelectorAll("form").forEach(resetDirect);  // coming back with the Back button: start fresh
+});
 
 // ---------- Avatar preview ----------
 document.querySelectorAll("[data-avatar-input]").forEach((input) => {
@@ -505,14 +576,25 @@ if (document.body.dataset.authenticated === "true") {
       if (sending) return;
       const body = box.value.trim();
       if (!body && !pending.length) return;
-      if (tooBigToSend(pending)) { toast(tooBigMessage(), "error"); return; }
+      if (!directUploads && tooBigToSend(pending)) { toast(tooBigMessage(), "error"); return; }
       sending = true;
       const button = form.querySelector("button[type=submit]");
       button.disabled = true;
       const data = new FormData();
       data.append("body", body);
       const files = pending;
-      files.forEach((f) => data.append("files", f));
+      if (directUploads && files.length) {
+        try {
+          (await Promise.all(files.map(uploadDirect))).forEach((token) => data.append(DIRECT_PREFIX + "files", token));
+        } catch (err) {
+          toast(err.message, "error");
+          sending = false;
+          button.disabled = false;
+          return;
+        }
+      } else {
+        files.forEach((f) => data.append("files", f));
+      }
       box.value = "";  // clear straight away so the same text can't be sent twice
       pending = [];
       renderChips();

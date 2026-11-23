@@ -23,13 +23,14 @@ VERCEL_ENV = {
 def settings_on_vercel(**extra):
     """Load the real settings in a fresh Python with Vercel's environment and return the values we check."""
     env = {k: v for k, v in os.environ.items() if not k.startswith(("VERCEL", "RENDER", "DEBUG", "SITE_URL",
-                                                                     "DATABASE_URL", "MAX_UPLOAD_MB"))}
+                                                                     "DATABASE_URL", "MAX_UPLOAD_MB", "CLOUDINARY",
+                                                                     "DIRECT_UPLOADS"))}
     env.update(VERCEL_ENV, DJANGO_SETTINGS_MODULE="config.settings", **extra)
     code = ("import json; from django.conf import settings as s; db = s.DATABASES['default']; print(json.dumps({"
             "'debug': s.DEBUG, 'hosts': s.ALLOWED_HOSTS, 'csrf': s.CSRF_TRUSTED_ORIGINS, 'site': s.SITE_URL,"
             "'max_age': db['CONN_MAX_AGE'], 'cursors': db.get('DISABLE_SERVER_SIDE_CURSORS', False),"
             "'prepare': db.get('OPTIONS', {}).get('prepare_threshold', 'unset'), 'media': str(s.MEDIA_ROOT),"
-            "'upload': s.MAX_UPLOAD_MB, 'request': s.MAX_REQUEST_MB, 'host': s.HOSTING_NAME}))")
+            "'upload': s.MAX_UPLOAD_MB, 'request': s.MAX_REQUEST_MB, 'host': s.HOSTING_NAME, 'direct': s.DIRECT_UPLOADS}))")
     out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, check=True)
     return json.loads(out.stdout.strip().splitlines()[-1])
 
@@ -44,7 +45,14 @@ def test_settings_on_vercel():
     assert s["cursors"] is True and s["prepare"] is None  # Supabase transaction pooler (port 6543)
     assert s["media"] == "/tmp/media"  # the only writable folder there
     assert s["upload"] == 4 and s["request"] == 4  # Vercel refuses requests over 4.5 MB
-    assert s["host"] == "Vercel"
+    assert s["host"] == "Vercel" and s["direct"] is False  # no Cloudinary: files travel with the form
+
+
+def test_vercel_with_cloudinary_uploads_straight_to_it():
+    s = settings_on_vercel(CLOUDINARY_URL="cloudinary://123:abc@demo")
+    assert s["direct"] is True and s["upload"] == 10  # Cloudinary's free-plan limit per file, not Vercel's 4.5 MB
+    s = settings_on_vercel(CLOUDINARY_URL="cloudinary://123:abc@demo", DIRECT_UPLOADS="false")
+    assert s["direct"] is False and s["upload"] == 4
 
 
 def test_vercel_settings_can_be_overridden():

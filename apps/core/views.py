@@ -83,3 +83,34 @@ def run_scheduled_view(request):
         return JsonResponse({"status": "ok", "result": run_all()})
     finally:
         cache.delete("run-scheduled-lock")
+
+
+def upload_sign_view(request):
+    """Permission for the browser to send one file straight to Cloudinary (see core/direct_uploads.py)."""
+    import json
+
+    from django.http import JsonResponse
+
+    from apps.core import direct_uploads
+    from apps.core.ratelimit import allow
+
+    def error(message, status=400):
+        return JsonResponse({"error": {"message": message}}, status=status)
+
+    if request.method != "POST":
+        return error("Use POST.", 405)
+    user = request.user
+    if not user.is_authenticated:
+        return error("Sign in to upload files.", 403)
+    if not user.is_active or user.is_suspended:
+        return error("Your account can't upload files right now.", 403)
+    if not allow(f"upload-sign:{user.pk}", *direct_uploads.SIGN_RATE):
+        return error("You've uploaded a lot of files in the last hour. Try again later.", 429)
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        return error("Bad request.")
+    try:
+        return JsonResponse(direct_uploads.sign(user, body.get("name"), body.get("size"), body.get("type") or ""))
+    except direct_uploads.DirectUploadError as exc:
+        return error(str(exc))

@@ -124,6 +124,16 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Uploads up to 10 MB on Vercel, and NexAI can read stored files again (v0.17)
+- **Direct uploads:** the website sends files straight to Cloudinary, so Vercel's 4.5 MB request limit no longer
+  applies. The limit is now **10 MB per file** (Cloudinary's free plan). NexSpace then picks each file up and runs the
+  same checks as before (real file type, size, photo shrinking, NexAI reading), and deletes the temporary copy.
+  Files uploaded but never sent are deleted by the scheduled job. Works for posts, messages, course materials,
+  profile photos and announcements. Turn off with `DIRECT_UPLOADS=false`. Details: `apps/core/direct_uploads.py`.
+- **Fixed:** files stored on Cloudinary couldn't be read back, so NexAI showed "This file couldn't be read." for
+  every material and OCR never ran. They're read now, and earlier failures are queued again automatically.
+- The Android app still uploads through the server (about 4 MB on Vercel) until it's updated.
+
 ## Black like X (v0.16)
 - The dark theme is now pure black with soft-grey panels and dividers, like X. It's the default for everyone,
   including people who were on "match my device". Light mode is still one tap away (Theme in the menu, or Settings).

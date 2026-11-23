@@ -8,7 +8,7 @@ or the protected /internal/run-scheduled/ URL (free schedulers such as cron-job.
 - NexAI indexing of new resources
 - OCR of photos and scanned pages (OCR.space, within a time budget and a daily page limit)
 - Push notification delivery
-- Housekeeping: delete read notifications older than 90 days
+- Housekeeping: delete read notifications older than 90 days, and direct uploads never sent with a form
 
 Every step is idempotent (dedupe keys / sent flags), so running it often is safe.
 """
@@ -107,7 +107,19 @@ def run_all():
     from apps.notifications.digest import send_due_digests
 
     digests = send_due_digests(now)
-    result = {**counts, "indexed": indexed, "ocr_pages": ocr_result["pages"], "push": push, "cleaned": deleted, "digests": digests}
+
+    # 8. Direct uploads that were sent to Cloudinary but never posted with a form
+    from apps.core import direct_uploads
+
+    try:
+        staging = direct_uploads.clean_up_staging()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning("Couldn't tidy unsent direct uploads", exc_info=True)
+        staging = 0
+    result = {**counts, "indexed": indexed, "ocr_pages": ocr_result["pages"], "push": push, "cleaned": deleted,
+              "digests": digests, "unsent_uploads_deleted": staging}
     from django.core.cache import cache
 
     cache.set("last-scheduled-run", {"at": now.isoformat(), "result": result}, None)

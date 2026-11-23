@@ -74,6 +74,21 @@ class CloudinaryStorage(Storage):
     def size(self, name):
         return 0
 
+    def _open(self, name, mode="rb"):
+        """Read a stored file back (NexAI and OCR read uploaded materials). Goes through Cloudinary's API,
+        so it works for every file type, including PDFs on accounts that block PDF delivery."""
+        from django.core.files.base import ContentFile
+
+        from apps.core.direct_uploads import _download
+
+        resource_type, _, rest = name.partition("/")
+        if resource_type == "raw":
+            data = _download(rest, resource_type="raw")
+        else:
+            public_id, _, fmt = rest.rpartition(".")
+            data = _download(public_id or rest, resource_type=resource_type, fmt=fmt if public_id else "")
+        return ContentFile(data, name=posixpath.basename(name))
+
 
 # --- Supabase Storage (S3-compatible) ---------------------------------------------------
 from storages.backends.s3 import S3Storage  # noqa: E402

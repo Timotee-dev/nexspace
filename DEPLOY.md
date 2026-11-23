@@ -8,8 +8,9 @@ Vercel runs NexSpace as a serverless function: no server to keep awake, and page
 It uses the same Supabase database, Cloudinary storage and Brevo email as Render, so nothing is lost when you move.
 
 **Limits on Vercel's free plan:**
-- **Uploads: 4 MB per form.** Vercel refuses anything bigger before it reaches NexSpace. The site tells people
-  the limit before they send. (Render allowed 100 MB because it compressed big files on the server.)
+- **Uploads: 10 MB per file** (v0.17). Vercel refuses any request over 4.5 MB, so the website sends files straight
+  to Cloudinary instead, and 10 MB is Cloudinary's free-plan limit. This needs `CLOUDINARY_URL`; without it the
+  limit is 4 MB per form. The Android app still sends files through Vercel, so it stays at about 4 MB until it's updated.
 - **Scheduled jobs** (reminders, trending, NexAI reading, OCR, push): Vercel's free cron runs them **once a day**.
   For every 15 minutes, add the free cron-job.org step below.
 

@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.templatetags.static import static
 
-SW_VERSION = "nexspace-v6"
+SW_VERSION = "nexspace-v7"
 
 
 def manifest_view(request):

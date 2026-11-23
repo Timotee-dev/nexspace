@@ -16,7 +16,7 @@ CSP = "; ".join([
     "font-src 'self' https://fonts.gstatic.com",
     f"img-src 'self' data: blob: {STORAGE_HOSTS}",
     f"media-src 'self' blob: {STORAGE_HOSTS}",
-    "connect-src 'self'",
+    "connect-src 'self' https://api.cloudinary.com",  # direct uploads go straight to Cloudinary
     "worker-src 'self'",
     "manifest-src 'self'",
     "frame-src 'none'",
@@ -47,3 +47,50 @@ class SecurityHeadersMiddleware:
                 and not request.path.startswith(("/static/", "/manifest.webmanifest", "/sw.js"))):
             response.headers["Cache-Control"] = "private, no-cache"
         return response
+
+
+class DirectUploadMiddleware:
+    """Turns files the browser sent straight to Cloudinary back into normal uploads (see core/direct_uploads.py).
+
+    Forms then see them in request.FILES exactly as if they had been sent with the form, so every check and
+    view works unchanged. The app's API (/api/) is left alone: the Android app still sends files directly.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if self._wants(request):
+            from apps.core import direct_uploads
+
+            keys = direct_uploads.fields_in(request.POST)
+            if keys:
+                try:
+                    for key in keys:
+                        for token in request.POST.getlist(key)[:10]:
+                            request.FILES.appendlist(direct_uploads.target_field(key),
+                                                     direct_uploads.receive(request.user, token))
+                except direct_uploads.DirectUploadError as exc:
+                    return self._failed(request, str(exc))
+        return self.get_response(request)
+
+    @staticmethod
+    def _wants(request) -> bool:
+        from apps.core import direct_uploads
+
+        content_type = request.META.get("CONTENT_TYPE", "")
+        return (request.method == "POST" and direct_uploads.enabled() and not request.path.startswith("/api/")
+                and content_type.startswith(("multipart/form-data", "application/x-www-form-urlencoded"))
+                and getattr(request, "user", None) is not None and request.user.is_authenticated)
+
+    @staticmethod
+    def _failed(request, message):
+        from django.contrib import messages
+        from django.http import HttpResponseRedirect, JsonResponse
+
+        from apps.core.net import safe_next
+
+        if "application/json" in request.headers.get("Accept", ""):
+            return JsonResponse({"error": {"message": message}}, status=400)
+        messages.error(request, message)
+        return HttpResponseRedirect(safe_next(request, request.META.get("HTTP_REFERER"), "/"))

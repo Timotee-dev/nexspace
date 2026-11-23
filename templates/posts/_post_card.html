@@ -73,6 +73,7 @@
     <footer class="post-actions">
       {% include "posts/_vote.html" with kind="post" obj=post up=post.my_vote_up down=post.my_vote_down %}
       <a class="action" href="{{ post.get_absolute_url }}#comments" aria-label="{{ post.comment_count }} comments"><svg class="icon-sm"><use href="#i-comment"/></svg><span>{{ post.comment_count|compact }}</span></a>
+      {% if post|shareable %}
       <details class="menu repost-menu">
         <summary class="action{% if post.is_reposted %} is-on{% endif %}" aria-label="Repost or quote ({{ post.repost_count }})" data-repost-summary="{{ post.pk }}"><svg class="icon-sm"><use href="#i-repost"/></svg><span data-repost-count>{{ post.repost_count|compact }}</span></summary>
         <div class="menu-panel">
@@ -84,6 +85,9 @@
           <a class="menu-item" href="{% url 'posts:quote' post.pk %}">Quote</a>
         </div>
       </details>
+      {% else %}
+      <span class="action" title="Posts in private Spaces stay in the Space, so they can't be reposted" aria-label="Reposting is off for private Space posts"><svg class="icon-sm" aria-hidden="true"><use href="#i-repost"/></svg><span>{{ post.repost_count|compact }}</span></span>
+      {% endif %}
       <form method="post" action="{% url 'posts:bookmark' post.pk %}" data-bookmark="{{ post.pk }}">
         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}#post-{{ post.pk }}">
         <button type="submit" class="action" aria-pressed="{% if post.is_bookmarked %}true{% else %}false{% endif %}" aria-label="Save post"><svg class="icon-sm"><use href="#i-bookmark"/></svg></button>

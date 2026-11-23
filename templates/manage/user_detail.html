@@ -39,6 +39,15 @@
 </section>
 
 <section class="panel stack" style="margin-top:16px">
+  {% if not member.staff %}
+  <h2 class="section-title">Level</h2>
+  <form method="post" action="{% url 'manage:user-action' member.pk %}" class="form role-form">{% csrf_token %}<input type="hidden" name="action" value="set_level">
+    <div class="field"><label for="set-level">Change their level</label>
+      <select id="set-level" name="level">{% for value, label in levels %}<option value="{{ value }}"{% if value == member.level %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <p class="hint small muted">Students can only move up one level a year themselves. Use this to correct a level, for repeating a year or direct entry.</p></div>
+    <div class="form-actions"><button type="submit" class="btn btn-ghost btn-sm">Save level</button></div>
+  </form>
+  {% endif %}
   <h2 class="section-title">Account actions</h2>
   <form method="post" action="{% url 'manage:user-action' member.pk %}" class="mod-actions">{% csrf_token %}
     <label for="note" class="visually-hidden">Note</label><input id="note" name="note" maxlength="500" placeholder="Reason (saved to the moderation log)">

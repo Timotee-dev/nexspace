@@ -124,6 +124,18 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Audit fixes (v0.19)
+A full check of the site as 13 kinds of user (owner, admins, reps, lecturers, students of different levels,
+unverified, suspended, other departments, signed out) found no redirect loops, no crashes and no slow pages,
+and about 60 attempts to do things people shouldn't (read private Spaces or other people's messages, upload or
+remove course materials, approve other levels' requests, edit others' posts, use admin pages) were all refused.
+Two things were fixed:
+- **Level changes:** students could change their level at any time, so a 200 Level student could switch to
+  300 Level and join 300 Level courses without approval. Now: any change in the first 7 days (to fix a mistake),
+  then only up one level, once every 6 months. Admins can set any level in Admin → People → a person → Level.
+- **Repost/Quote** is no longer offered on posts in private Spaces (it was always refused, so the button
+  only led to an error).
+
 ## Big files are compressed instead of refused (v0.18)
 - Files up to **50 MB** can be picked. Big ones go to Cloudinary in 9 MB pieces (its free plan takes 10 MB per
   file), NexSpace joins them, and the usual compression shrinks them to fit Cloudinary's 10 MB per stored file:

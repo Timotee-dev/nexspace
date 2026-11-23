@@ -42,7 +42,7 @@ AUDIT_PHRASES = {
     "space.saved": "saved a Space", "staff.requested": "signed up as staff", "staff.verified": "verified staff account",
     "staff.rejected": "rejected staff account", "user.banned": "banned", "user.unbanned": "unbanned",
     "user.suspended": "suspended", "user.unsuspended": "lifted the suspension of",
-    "user.email_verified_manually": "manually verified the email of",
+    "user.email_verified_manually": "manually verified the email of", "user.level_changed": "changed the level of",
 }
 
 

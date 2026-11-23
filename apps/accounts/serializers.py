@@ -95,6 +95,14 @@ class MeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("That username is taken.")
         return value
 
+    def validate_level(self, value):
+        from .services import level_change_problem
+
+        problem = level_change_problem(self.instance, value)
+        if problem:
+            raise serializers.ValidationError(problem)
+        return value
+
     def validate_matric_number(self, value):
         value = (value or "").strip().upper()
         if value and User.objects.filter(matric_number=value).exclude(pk=self.instance.pk).exists():
@@ -104,6 +112,10 @@ class MeSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         profile_data = validated_data.pop("profile", {})
         interests = profile_data.pop("interests", None)
+        if "level" in validated_data:
+            from .services import apply_level
+
+            apply_level(instance, validated_data.pop("level"))
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

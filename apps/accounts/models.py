@@ -60,6 +60,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verified = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     onboarding_completed = models.BooleanField(default=False)
+    # When the student last moved up a level themselves (see accounts.services.level_change_problem).
+    level_changed_at = models.DateTimeField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
     suspended_until = models.DateTimeField(null=True, blank=True)

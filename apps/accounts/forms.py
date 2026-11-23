@@ -145,6 +145,8 @@ class ProfileForm(forms.Form):
             del self.fields["matric_number"]
         else:
             self.fields["level"].required = True
+            self.fields["level"].help_text = ("You can move up one level at a time, once every 6 months. "
+                                              "For any other change, ask your department admin.")
 
     @classmethod
     def initial_for(cls, user):
@@ -160,6 +162,15 @@ class ProfileForm(forms.Form):
             "linkedin_url": p.linkedin_url,
             "portfolio_url": p.portfolio_url,
         }
+
+    def clean_level(self):
+        from .services import level_change_problem
+
+        level = self.cleaned_data.get("level")
+        problem = level_change_problem(self.user, level)
+        if problem:
+            raise forms.ValidationError(problem)
+        return level
 
     def clean_username(self):
         username = self.cleaned_data["username"].lower()
@@ -200,7 +211,9 @@ class ProfileForm(forms.Form):
         user.full_name = data["full_name"]
         user.username = data["username"]
         if "level" in self.fields:
-            user.level = data["level"]
+            from .services import apply_level
+
+            apply_level(user, data["level"])
             user.matric_number = data["matric_number"]
         user.save()
         if data.get("remove_avatar") and profile.avatar:

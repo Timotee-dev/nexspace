@@ -194,3 +194,17 @@ def test_onboarding_sends_requests(client, make_user, club, course):
     assert SpaceMembership.objects.filter(user=user, space=course.space).exists()
     assert SpaceJoinRequest.objects.filter(user=user, space=club, status="pending").exists()
     assert not SpaceMembership.objects.filter(user=user, space=club).exists()
+
+
+def test_private_space_posts_offer_no_repost_menu(client, club, make_user):
+    """Reposting a private Space's post is refused (it would leak), so the menu isn't shown at all."""
+    from apps.posts import services as posts
+
+    owner = club.created_by
+    secret = posts.create_post(author=owner, kind="post", body="members only", space=club)
+    public = posts.create_post(author=owner, kind="post", body="for everyone")
+    client.force_login(owner)
+    html = client.get(reverse("core:home")).content.decode() + client.get(club.get_absolute_url() + "?tab=posts").content.decode()
+    assert reverse("posts:quote", args=[public.pk]) in html
+    assert reverse("posts:quote", args=[secret.pk]) not in html
+    assert "Reposting is off for private Space posts" in html

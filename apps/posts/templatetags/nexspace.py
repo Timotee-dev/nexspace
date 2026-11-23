@@ -91,3 +91,13 @@ def needs_approval(space, user):
         return False
     course = getattr(space, "course", None) if getattr(space, "course_id", None) else None
     return not (course is not None and getattr(user, "level", None) and course.level == user.level)
+
+
+@register.filter
+def shareable(post):
+    """Whether Repost/Quote make sense for this post. Posts in private Spaces can't be reposted (they'd leak
+    outside the Space), so their menu isn't offered. Mirrors posts.services.can_repost."""
+    original = post.repost_of if getattr(post, "repost_of_id", None) and post.kind == "repost" else post
+    if original is None or original.is_deleted or original.is_hidden:
+        return False
+    return not (original.space_id and original.space.requires_approval)

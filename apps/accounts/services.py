@@ -362,3 +362,67 @@ def managed_courses(user):
                   .values_list("level", flat=True))
     taught = list(assignments.filter(role=R.LECTURER, course__isnull=False).values_list("course_id", flat=True))
     return courses.filter(Q(level__in=levels) | Q(pk__in=taught))
+
+
+# --- Changing level ---------------------------------------------------------------------------------
+# A student's level decides which courses they join without approval, so they can't pick any level they
+# like. In their first week they can fix a mistake freely; after that they can move up one level, once every
+# six months (the normal yearly move). Anything else (going down, skipping a level) is done by an admin.
+LEVEL_FIX_DAYS = 7
+LEVEL_STEP_DAYS = 182
+
+
+def level_change_problem(user, new_level):
+    """Why this person can't change their own level to new_level, or None if they can."""
+    from django.utils import timezone
+
+    from apps.academics.models import Level
+
+    if new_level in (None, "") or new_level == user.level:
+        return None
+    if getattr(user, "staff", None):
+        return "Staff accounts don't have a level."
+    now = timezone.now()
+    if not user.onboarding_completed or user.level is None or user.date_joined >= now - timedelta(days=LEVEL_FIX_DAYS):
+        return None  # still setting up, or fixing a mistake in the first week
+    levels = list(Level.values)
+    current = levels.index(user.level) if user.level in levels else -1
+    if current < 0 or current + 1 >= len(levels) or new_level != levels[current + 1]:
+        nxt = f" (to {levels[current + 1]} Level)" if 0 <= current < len(levels) - 1 else ""
+        return (f"You can move up one level at a time{nxt}. If your level is wrong, ask your department admin "
+                "to change it.")
+    if user.level_changed_at and user.level_changed_at > now - timedelta(days=LEVEL_STEP_DAYS):
+        again = timezone.localtime(user.level_changed_at + timedelta(days=LEVEL_STEP_DAYS))
+        return (f"You moved up a level recently. You can move up again from {again:%-d %B %Y}. If your level is "
+                "wrong, ask your department admin to change it.")
+    return None
+
+
+def apply_level(user, new_level):
+    """Set the level on `user` (not saved). Records the date when it's a move up after the first week."""
+    from django.utils import timezone
+
+    if new_level in (None, "") or new_level == user.level:
+        return
+    if user.onboarding_completed and user.date_joined < timezone.now() - timedelta(days=LEVEL_FIX_DAYS):
+        user.level_changed_at = timezone.now()
+    user.level = new_level
+
+
+def admin_set_level(*, admin, user, level):
+    """Admins can put anyone on any level (corrections, repeating a year, direct entry)."""
+    from django.core.exceptions import ValidationError
+
+    from apps.academics.models import Level
+    from apps.core.models import audit
+
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        raise ValidationError("Choose a level.")
+    if level not in Level.values:
+        raise ValidationError("Choose a level.")
+    old = user.level
+    user.level = level
+    user.save(update_fields=["level"])
+    audit(admin, "user.level_changed", user, old=old, new=level)

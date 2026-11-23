@@ -152,7 +152,7 @@ def user_detail_view(request, pk):
     member = get_object_or_404(User.objects.select_related("profile"), pk=pk, department=dept)
     form = RoleForm(department=dept, user=request.user)
     return _render(request, "manage/user_detail.html", {
-        "member": member, "role_form": form,
+        "member": member, "role_form": form, "levels": Level.choices,
         "roles": member.role_assignments.select_related("course", "department"),
         "stats": {
             "posts": member.posts.filter(is_deleted=False).count(),
@@ -195,6 +195,11 @@ def user_action_view(request, pk):
             revoke_role(user=member, role=ra.role, department=ra.department, course=ra.course, level=ra.level,
                         revoked_by=request.user)
             messages.success(request, "Role removed.")
+        elif action == "set_level":
+            from apps.accounts.services import admin_set_level
+
+            admin_set_level(admin=request.user, user=member, level=request.POST.get("level"))
+            messages.success(request, f"Level changed to {member.level} Level.")
         elif action == "verify_email":
             member.email_verified = True
             member.save(update_fields=["email_verified"])

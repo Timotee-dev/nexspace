@@ -1,19 +1,20 @@
 /* =========================================================================
    NexSpace design system
-   Ink-navy surfaces, chalk-white text, one highlighter-amber accent.
+   Black like X: pure-black page, soft-grey panels and dividers, white text, one highlighter-amber accent.
    The highlighter marks "where you are" and "what you picked" — nothing else.
    ========================================================================= */
 
 :root {
-  /* Dark (default) */
-  --ink: #121a2e;
-  --surface: #19223b;
-  --raised: #212c4a;
-  --line: #2c3a5e;
-  --line-soft: #233052;
-  --text: #e9ecf5;
-  --muted: #9aa3c0;
-  --faint: #8a93b3;
+  /* Dark (default): black, like X */
+  --ink: #000000;
+  --surface: #16181c;
+  --raised: #202327;
+  --line: #2f3336;
+  --line-soft: #2f3336;
+  --text: #e7e9ea;
+  --muted: #8b9096;
+  --faint: #8b9096;
+  --hover: rgba(231, 233, 234, 0.04);
   --marker: #f5c451;
   --marker-ink: #221a03;
   --marker-soft: rgba(245, 196, 81, 0.16);
@@ -25,7 +26,7 @@
   --danger-soft: rgba(240, 113, 107, 0.14);
   --info-soft: rgba(122, 167, 255, 0.12);
   --focus: #9dbcff;
-  --shadow: 0 10px 30px rgba(3, 7, 20, 0.35);
+  --shadow: 0 0 15px rgba(255, 255, 255, 0.12), 0 0 3px 1px rgba(255, 255, 255, 0.1);
 
   --font: "Onest", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 
@@ -72,6 +73,7 @@
   --info-soft: rgba(52, 102, 214, 0.08);
   --focus: #3466d6;
   --shadow: 0 10px 30px rgba(21, 28, 47, 0.1);
+  --hover: rgba(21, 28, 47, 0.03);
   color-scheme: light;
 }
 
@@ -594,6 +596,11 @@ p { margin: 0; }
   padding: var(--s4) 0; border-bottom: 1px solid var(--line-soft);
 }
 .post:target { background: var(--marker-soft); border-radius: var(--r-sm); }
+/* In the feed, posts run edge to edge like X, with a faint highlight under the pointer */
+.feed > .post { margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); transition: background 0.15s var(--ease); }
+.feed > .post:target { border-radius: 0; }
+@media (hover: hover) { .feed > .post:hover { background: var(--hover); } }
+@media (min-width: 768px) { .feed > .post { margin-inline: calc(-1 * var(--s6)); padding-inline: var(--s6); } }
 .post-main { min-width: 0; display: grid; gap: var(--s2); }
 .post-head { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
 .post-by { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
@@ -748,7 +755,7 @@ p { margin: 0; }
 .attach-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .attach-preview button {
   position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border-radius: 50%; border: 0;
-  background: rgba(10, 14, 28, 0.75); color: #fff; cursor: pointer; font-size: 18px; line-height: 1; z-index: 1;
+  background: rgba(0, 0, 0, 0.75); color: #fff; cursor: pointer; font-size: 18px; line-height: 1; z-index: 1;
 }
 .chip input:disabled + span { opacity: 0.45; }
 
@@ -1168,7 +1175,7 @@ label.chip { display: inline-flex; cursor: pointer; }
   .drawer-profile > span { display: grid; min-width: 0; }
   .drawer-head .icon-btn { font-size: 26px; }
   .drawer-backdrop {
-    position: fixed; inset: 0; z-index: 75; background: rgba(4, 8, 20, 0.55); opacity: 0; pointer-events: none;
+    position: fixed; inset: 0; z-index: 75; background: rgba(91, 112, 131, 0.4); opacity: 0; pointer-events: none;
     transition: opacity 0.26s var(--ease);
   }
   body.drawer-open { overflow: hidden; }

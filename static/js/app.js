@@ -71,7 +71,7 @@ document.addEventListener("click", (event) => {
 document.querySelectorAll(".toast").forEach(autoDismiss);
 
 // ---------- Theme ----------
-const THEMES = ["system", "dark", "light"];
+const THEMES = ["dark", "light", "system"];
 const THEME_LABELS = { system: "Theme: match device", dark: "Theme: dark", light: "Theme: light" };
 
 function resolve(pref) {
@@ -96,7 +96,7 @@ matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
 document.addEventListener("click", async (event) => {
   const btn = event.target.closest("[data-theme-toggle]");
   if (!btn) return;
-  const current = document.documentElement.dataset.themePref || "system";
+  const current = document.documentElement.dataset.themePref || "dark";
   const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
   applyTheme(next);
   try { localStorage.setItem("nexspace-theme", next); } catch { /* storage may be blocked */ }
@@ -108,7 +108,7 @@ document.addEventListener("click", async (event) => {
     }
   }
 });
-applyTheme(document.documentElement.dataset.themePref || "system");
+applyTheme(document.documentElement.dataset.themePref || "dark");
 
 // ---------- Password reveal ----------
 document.addEventListener("click", (event) => {

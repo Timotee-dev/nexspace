@@ -102,3 +102,12 @@ def test_privacy_and_theme_settings(client, user):
     user.profile.refresh_from_db()
     assert user.profile.theme == "light"
     assert 'data-theme-pref="light"' in client.get(reverse("core:home")).content.decode()
+
+
+def test_black_theme_is_the_default(client, make_user):
+    """NexSpace is black like X: new accounts and visitors start on the dark theme."""
+    user = make_user(email="black@example.com")
+    assert user.profile.theme == "dark"
+    assert 'data-theme-pref="dark"' in client.get(reverse("accounts:login")).content.decode()
+    client.force_login(user)
+    assert 'data-theme-pref="dark"' in client.get(reverse("core:home")).content.decode()

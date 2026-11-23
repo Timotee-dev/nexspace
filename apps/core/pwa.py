@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.templatetags.static import static
 
-SW_VERSION = "nexspace-v5"
+SW_VERSION = "nexspace-v6"
 
 
 def manifest_view(request):
@@ -18,8 +18,8 @@ def manifest_view(request):
         "scope": "/",
         "display": "standalone",
         "orientation": "portrait-primary",
-        "background_color": "#121a2e",
-        "theme_color": "#121a2e",
+        "background_color": "#000000",
+        "theme_color": "#000000",
         "icons": [
             {"src": static("img/icon-192.png"), "sizes": "192x192", "type": "image/png"},
             {"src": static("img/icon-512.png"), "sizes": "512x512", "type": "image/png"},

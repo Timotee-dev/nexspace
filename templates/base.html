@@ -1,12 +1,12 @@
 {% load static %}<!doctype html>
-<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ theme_preference }}{% else %}system{% endif %}" data-guest="{% if user.is_authenticated %}false{% else %}true{% endif %}">
+<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ theme_preference }}{% else %}dark{% endif %}" data-guest="{% if user.is_authenticated %}false{% else %}true{% endif %}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}NexSpace{% endblock %} · NexSpace</title>
   <meta name="description" content="{% block description %}NexSpace is the digital home of your department: classmates, course materials, announcements and opportunities in one place.{% endblock %}">
   {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
-  <meta name="theme-color" content="#121a2e">
+  <meta name="theme-color" content="#000000">
   <script src="{% static 'js/theme.js' %}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

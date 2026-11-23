@@ -1,7 +1,7 @@
 /* Runs before the page paints, so there is no flash of the wrong theme. Kept as a file (not inline)
    so the Content-Security-Policy can forbid inline scripts entirely. */
 (function () {
-  var root = document.documentElement, pref = root.dataset.themePref;
+  var root = document.documentElement, pref = root.dataset.themePref || "dark";
   if (root.dataset.guest === "true") {
     try { pref = localStorage.getItem("nexspace-theme") || pref; } catch (e) {}
   }

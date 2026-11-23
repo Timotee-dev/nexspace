@@ -1,7 +1,7 @@
 # Used by Vercel (vercel.com) to build and run NexSpace. Local development still uses requirements.txt.
 [project]
 name = "nexspace"
-version = "0.15.0"
+version = "0.16.0"
 description = "NexSpace: the digital home of the department"
 requires-python = ">=3.13"
 dependencies = [

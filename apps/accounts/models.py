@@ -219,7 +219,7 @@ class Profile(models.Model):
 
     allow_messages_from = models.CharField(max_length=10, choices=MessagePermission.choices,
                                            default=MessagePermission.EVERYONE)
-    theme = models.CharField(max_length=8, choices=Theme.choices, default=Theme.SYSTEM)
+    theme = models.CharField(max_length=8, choices=Theme.choices, default=Theme.DARK)
 
     updated_at = models.DateTimeField(auto_now=True)
 

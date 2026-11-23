@@ -124,6 +124,11 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Black like X (v0.16)
+- The dark theme is now pure black with soft-grey panels and dividers, like X. It's the default for everyone,
+  including people who were on "match my device". Light mode is still one tap away (Theme in the menu, or Settings).
+- Feed posts run edge to edge across the middle column with a faint highlight under the pointer.
+
 ## Runs on Vercel (v0.15)
 - NexSpace deploys on **Vercel** as well as Render. Vercel detects Django from `manage.py`; `pyproject.toml` lists the
   packages and Python 3.13, `vercel.json` sets the time limit and a daily cron, and `vercel_build.py` applies migrations

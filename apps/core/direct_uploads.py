@@ -1,13 +1,18 @@
 """Direct uploads: the browser sends files straight to Cloudinary, not through NexSpace's server.
 
 Why: Vercel refuses any request over 4.5 MB before it reaches NexSpace. Files sent straight to Cloudinary
-skip that limit, so uploads can be as big as Cloudinary's free plan allows (10 MB per file).
+skip that limit.
+
+Big files: Cloudinary's free plan takes at most 10 MB per file, even temporarily. So a bigger file (up to
+MAX_UPLOAD_MB, 50 MB on Vercel) is cut into pieces of 9 MB in the browser, each piece is uploaded on its own,
+and NexSpace joins them back together. The normal upload checks then compress it (photos resized, pictures
+inside PDF/Word/PowerPoint files recompressed) so the stored file fits Cloudinary's 10 MB.
 
 How it works:
 1. The browser asks NexSpace for permission to upload one file (`/uploads/sign/`). NexSpace checks the size
    and type, picks a random name in a temporary "staging" folder, and returns a Cloudinary signature for
    exactly that name plus a token tied to this user.
-2. The browser uploads the file to Cloudinary with that signature.
+2. The browser uploads the file (or each 9 MB piece) to Cloudinary with those signatures.
 3. The browser submits the form as usual, but with the token (`__direct__<field>`) instead of the file.
 4. DirectUploadMiddleware turns each token back into a normal uploaded file (downloading it from the staging
    folder), so every view, form and check works exactly as it did for files sent the old way: real file-type
@@ -34,6 +39,7 @@ SALT = "nexspace.direct-upload"
 TOKEN_MAX_AGE = 6 * 60 * 60          # a form can be left open for a while before it's sent
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx", ".ppt", ".pptx"}
 SIGN_RATE = (120, 60 * 60)           # signatures per user per hour
+PART_BYTES = 9 * 1024 * 1024         # under Cloudinary's free-plan limit of 10 MB per file
 
 
 class DirectUploadError(Exception):
@@ -73,15 +79,17 @@ def sign(user, name: str, size, content_type: str = "") -> dict:
         raise DirectUploadError(f"{name} is too big. Files can be up to {settings.MAX_UPLOAD_MB} MB.")
 
     cloudinary = _cloudinary()
-    public_id = f"{STAGING}/{user.pk}/{uuid.uuid4().hex}{ext}"
-    fields = cloudinary.utils.sign_request({"timestamp": int(time.time()), "public_id": public_id, "tags": TAG}, {})
+    url = cloudinary.utils.cloudinary_api_url("upload", resource_type="raw")
+    batch, count = uuid.uuid4().hex, -(-size // PART_BYTES)  # pieces of at most 9 MB
+    public_ids = [f"{STAGING}/{user.pk}/{batch}{ext}" if count == 1 else f"{STAGING}/{user.pk}/{batch}.part{i}"
+                  for i in range(count)]
+    stamp = int(time.time())
+    parts = [{"url": url, "fields": cloudinary.utils.sign_request({"timestamp": stamp, "public_id": pid, "tags": TAG}, {})}
+             for pid in public_ids]
     content_type = (content_type or mimetypes.guess_type(name)[0] or "application/octet-stream")[:100]
-    token = signing.dumps({"u": user.pk, "p": public_id, "n": name, "t": content_type, "s": size}, salt=SALT)
-    return {
-        "url": cloudinary.utils.cloudinary_api_url("upload", resource_type="raw"),
-        "fields": fields,
-        "token": token,
-    }
+    token = signing.dumps({"u": user.pk, "p": public_ids, "n": name, "t": content_type, "s": size}, salt=SALT)
+    return {"parts": parts, "part_size": PART_BYTES, "token": token,
+            "url": parts[0]["url"], "fields": parts[0]["fields"]}  # url/fields: the first (or only) piece
 
 
 def _download(public_id: str, resource_type: str = "raw", fmt: str = "", limit: int | None = None) -> bytes:
@@ -112,20 +120,31 @@ def receive(user, token: str):
         raise DirectUploadError("That upload took too long. Choose the file again and resend.")
     except signing.BadSignature:
         raise DirectUploadError("That upload couldn't be checked. Choose the file again and resend.")
-    if data.get("u") != user.pk or not str(data.get("p", "")).startswith(f"{STAGING}/{user.pk}/"):
+    public_ids = data.get("p")
+    public_ids = [public_ids] if isinstance(public_ids, str) else list(public_ids or [])
+    mine = f"{STAGING}/{user.pk}/"
+    if data.get("u") != user.pk or not public_ids or not all(str(p).startswith(mine) for p in public_ids):
         raise DirectUploadError("That upload couldn't be checked. Choose the file again and resend.")
     try:
-        content = _download(data["p"], limit=_max_bytes())
+        pieces = [_download(pid, limit=PART_BYTES if len(public_ids) > 1 else _max_bytes()) for pid in public_ids]
     except DirectUploadError:
-        _destroy(data["p"])
+        _destroy_all(public_ids)
         raise
     except Exception:
-        logger.exception("Couldn't fetch staging upload %s", data["p"])
+        logger.exception("Couldn't fetch staging upload %s", public_ids[0])
         raise DirectUploadError(f"{data['n']} didn't finish uploading. Check your connection and send it again.")
-    _destroy(data["p"])
-    if not content:
+    _destroy_all(public_ids)
+    content = b"".join(pieces)
+    if not content or (data.get("s") and len(content) != data["s"]):
         raise DirectUploadError(f"{data['n']} didn't finish uploading. Send it again.")
+    if len(content) > _max_bytes():
+        raise DirectUploadError(f"{data['n']} is too big. Files can be up to {settings.MAX_UPLOAD_MB} MB.")
     return SimpleUploadedFile(data["n"], content, content_type=data.get("t") or "application/octet-stream")
+
+
+def _destroy_all(public_ids):
+    for public_id in public_ids:
+        _destroy(public_id)
 
 
 def clean_up_staging(older_than_hours: int = 6) -> int:

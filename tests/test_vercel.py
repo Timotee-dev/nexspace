@@ -50,7 +50,7 @@ def test_settings_on_vercel():
 
 def test_vercel_with_cloudinary_uploads_straight_to_it():
     s = settings_on_vercel(CLOUDINARY_URL="cloudinary://123:abc@demo")
-    assert s["direct"] is True and s["upload"] == 10  # Cloudinary's free-plan limit per file, not Vercel's 4.5 MB
+    assert s["direct"] is True and s["upload"] == 50  # sent in 9 MB pieces, then compressed to fit 10 MB
     s = settings_on_vercel(CLOUDINARY_URL="cloudinary://123:abc@demo", DIRECT_UPLOADS="false")
     assert s["direct"] is False and s["upload"] == 4
 

@@ -19,7 +19,9 @@ from apps.posts.models import Post
 def direct(settings, monkeypatch):
     """Direct uploads on, with a fake Cloudinary account and no network."""
     settings.DIRECT_UPLOADS = True
-    settings.MAX_UPLOAD_MB = 10
+    settings.MAX_UPLOAD_MB = 50
+    settings.STORAGE_FILE_LIMIT_MB = 10
+    settings.STORAGE_FILE_LIMIT_BYTES = 10 * 1024 * 1024
     old = cloudinary.config()
     saved = (old.cloud_name, old.api_key, old.api_secret)
     cloudinary.config(cloud_name="demo", api_key="123456", api_secret="topsecret")
@@ -43,9 +45,11 @@ def sign(client, name, size, kind=""):
 
 
 def upload(client, direct, name, content, kind=""):
-    """What the browser does: ask for permission, then 'upload' to Cloudinary. Returns the token."""
+    """What the browser does: ask for permission, then 'upload' to Cloudinary in pieces. Returns the token."""
     permit = sign(client, name, len(content), kind).json()
-    direct.store[permit["fields"]["public_id"]] = content
+    size = permit["part_size"]
+    for i, part in enumerate(permit["parts"]):
+        direct.store[part["fields"]["public_id"]] = content[i * size:(i + 1) * size]
     return permit["token"]
 
 
@@ -68,7 +72,7 @@ def test_signature_lets_the_browser_upload_one_named_file(client, user, direct):
 def test_signing_refuses_bad_requests(client, user, direct, settings):
     assert sign(client, "a.pdf", 100).status_code == 403  # signed out
     client.force_login(user)
-    assert "too big" in sign(client, "big.pdf", 11 * 1024 * 1024).json()["error"]["message"]
+    assert "too big" in sign(client, "big.pdf", 51 * 1024 * 1024).json()["error"]["message"]
     assert sign(client, "virus.exe", 100).status_code == 400
     assert sign(client, "empty.pdf", 0).status_code == 400
     assert client.get(reverse("core:upload-sign")).status_code == 405
@@ -231,3 +235,82 @@ def test_files_that_couldnt_be_read_are_queued_again(make_user, department):
     assert rows[made[0].pk].indexed_at is None and rows[made[0].pk].index_error == ""
     assert rows[made[1].pk].indexed_at is None and rows[made[1].pk].ocr_status == ""
     assert rows[made[2].pk].indexed_at is not None
+
+
+
+@pytest.mark.django_db
+def test_big_files_go_up_in_pieces(client, user, direct):
+    """Cloudinary's free plan takes 10 MB per file, so a 20 MB file is sent as three 9 MB pieces."""
+    client.force_login(user)
+    permit = sign(client, "scan.pdf", 20 * 1024 * 1024).json()
+    ids = [p["fields"]["public_id"] for p in permit["parts"]]
+    assert len(ids) == 3 and permit["part_size"] == 9 * 1024 * 1024
+    assert all(i.startswith(f"nexspace-staging/{user.pk}/") for i in ids) and len(set(ids)) == 3
+    for part in permit["parts"]:  # every piece has its own valid signature
+        f = part["fields"]
+        assert f["signature"] == cloudinary.utils.api_sign_request(
+            {"timestamp": f["timestamp"], "public_id": f["public_id"], "tags": f["tags"]}, "topsecret")
+    small = sign(client, "notes.pdf", 1000).json()
+    assert len(small["parts"]) == 1 and small["parts"][0]["fields"]["public_id"].endswith(".pdf")
+
+
+@pytest.mark.django_db
+def test_pieces_are_joined_in_order(user, direct, client):
+    client.force_login(user)
+    content = bytes(range(256)) * (80 * 1024)  # 20 MB, every byte position distinct enough to catch reordering
+    token = upload(client, direct, "scan.pdf", content)
+    received = direct_uploads.receive(user, token)
+    assert received.read() == content and received.name == "scan.pdf"
+    assert len(direct.destroyed) == 3  # every piece is deleted
+
+
+@pytest.mark.django_db
+def test_missing_piece_is_caught(user, direct, client):
+    client.force_login(user)
+    content = b"x" * (12 * 1024 * 1024)
+    permit = sign(client, "scan.pdf", len(content)).json()
+    direct.store[permit["parts"][0]["fields"]["public_id"]] = content[:9 * 1024 * 1024]
+    direct.store[permit["parts"][1]["fields"]["public_id"]] = b"short"  # the last piece didn't finish
+    with pytest.raises(direct_uploads.DirectUploadError, match="didn't finish uploading"):
+        direct_uploads.receive(user, permit["token"])
+
+
+@pytest.mark.django_db
+def test_a_photo_over_10_mb_is_compressed_to_fit(client, user, direct):
+    """A big phone photo (over Cloudinary's 10 MB) arrives in pieces and is shrunk before it's stored."""
+    import random
+
+    client.force_login(user)
+    rnd = random.Random(1)
+    image = Image.frombytes("RGB", (2600, 2000), bytes(rnd.getrandbits(8) for _ in range(2600 * 2000 * 3)))
+    buf = io.BytesIO()
+    image.save(buf, "PNG")  # noise doesn't compress: about 15 MB
+    raw = buf.getvalue()
+    assert len(raw) > 10 * 1024 * 1024
+    token = upload(client, direct, "board.png", raw, "image/png")
+    r = client.post(reverse("posts:compose"), {"kind": "post", "body": "big photo", "__direct__images": [token]})
+    assert r.status_code == 302
+    stored = Post.objects.get(body="big photo").images[0]
+    assert stored.file.size < 10 * 1024 * 1024
+
+
+@pytest.mark.django_db
+def test_a_pdf_over_10_mb_with_big_pictures_is_compressed_to_fit(client, user, direct):
+    """A scanned PDF over 10 MB arrives in pieces; its pictures are recompressed so it fits storage."""
+    import random
+
+    client.force_login(user)
+    rnd = random.Random(2)
+    pages = []
+    for _ in range(3):
+        noise = bytes(rnd.getrandbits(8) for _ in range(2200 * 1700 * 3))
+        pages.append(Image.frombytes("RGB", (2200, 1700), noise))
+    buf = io.BytesIO()
+    pages[0].save(buf, "PDF", save_all=True, append_images=pages[1:], quality=100)
+    raw = buf.getvalue()
+    assert len(raw) > 10 * 1024 * 1024
+    token = upload(client, direct, "scanned exam.pdf", raw, "application/pdf")
+    r = client.post(reverse("posts:compose"), {"kind": "post", "body": "big pdf", "__direct__files": [token]})
+    assert r.status_code == 302, r.content.decode()[:500]
+    stored = Post.objects.get(body="big pdf").files[0]
+    assert stored.original_name == "scanned exam.pdf" and stored.file.size < 10 * 1024 * 1024

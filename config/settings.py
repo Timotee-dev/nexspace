@@ -209,9 +209,10 @@ STORAGES = {
 # Direct uploads: with Cloudinary, browsers send files straight to it (apps/core/direct_uploads.py), so
 # Vercel's 4.5 MB request limit doesn't apply. Set DIRECT_UPLOADS=false to send files through the server.
 DIRECT_UPLOADS = env_bool("DIRECT_UPLOADS", True) and bool(CLOUDINARY_URL) and not SUPABASE_STORAGE
-# Vercel refuses any request bigger than 4.5 MB before it reaches NexSpace, so the default there is 4 MB,
-# or 10 MB (Cloudinary's free-plan limit per file) when files go straight to Cloudinary.
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", ("10" if DIRECT_UPLOADS else "4") if ON_VERCEL else "100"))
+# Vercel refuses any request bigger than 4.5 MB before it reaches NexSpace, so the default there is 4 MB.
+# With direct uploads it's 50 MB: big files go to Cloudinary in 9 MB pieces, then are compressed to fit
+# Cloudinary's 10 MB per stored file (COMPRESS_INPUT_MAX_MB is 50 too).
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", ("50" if DIRECT_UPLOADS else "4") if ON_VERCEL else "100"))
 MAX_IMAGE_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 # The browser checks that all the files in one form add up to less than this (0 = no check).
 MAX_REQUEST_MB = int(os.environ.get("MAX_REQUEST_MB", "4" if ON_VERCEL else "0"))
@@ -266,7 +267,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.17.0",
+    "VERSION": "0.18.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",

@@ -137,19 +137,27 @@ export const directUploads = document.body.dataset.directUpload === "1";
 const maxFileMb = Number(document.body.dataset.maxDocMb || 10);
 const DIRECT_PREFIX = "__direct__";
 
-export async function uploadDirect(file) {
+// Big files are sent in 9 MB pieces (Cloudinary's free plan takes 10 MB per file); NexSpace joins them and
+// compresses the result so it fits. onProgress(bytesSent) is called after each piece.
+export async function uploadDirect(file, onProgress = () => {}) {
   if (file.size > maxFileMb * 1024 * 1024) throw new Error(`${file.name} is too big. Files can be up to ${maxFileMb} MB.`);
   const permit = await api("/uploads/sign/", { method: "POST", body: { name: file.name, size: file.size, type: file.type } });
-  const data = new FormData();
-  Object.entries(permit.fields).forEach(([key, value]) => data.append(key, value));
-  data.append("file", file);
-  let response;
-  try {
-    response = await fetch(permit.url, { method: "POST", body: data });
-  } catch {
-    throw new Error(`${file.name} didn't upload. Check your connection and try again.`);
+  const parts = permit.parts || [{ url: permit.url, fields: permit.fields }];
+  const size = permit.part_size || file.size;
+  for (let i = 0; i < parts.length; i += 1) {
+    const piece = parts.length === 1 ? file : file.slice(i * size, (i + 1) * size);
+    const data = new FormData();
+    Object.entries(parts[i].fields).forEach(([key, value]) => data.append(key, value));
+    data.append("file", piece, parts.length === 1 ? file.name : `${file.name}.part${i}`);
+    let response;
+    try {
+      response = await fetch(parts[i].url, { method: "POST", body: data });
+    } catch {
+      throw new Error(`${file.name} didn't upload. Check your connection and try again.`);
+    }
+    if (!response.ok) throw new Error(`${file.name} didn't upload. Try again.`);
+    onProgress(Math.min((i + 1) * size, file.size));
   }
-  if (!response.ok) throw new Error(`${file.name} didn't upload. Try again.`);
   return permit.token;
 }
 
@@ -186,9 +194,20 @@ document.addEventListener("submit", async (event) => {
   const submitter = event.submitter;
   form.dataset.uploading = "1";
   submitter?.setAttribute("aria-busy", "true");
-  const note = toast(files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…");
+  const total = files.reduce((sum, { file }) => sum + file.size, 0);
+  const big = total > 9 * 1024 * 1024;
+  const label = files.length > 1 ? `Uploading ${files.length} files` : "Uploading";
+  const note = toast(big ? `${label}… 0%` : `${label}…`);
+  const sent = files.map(() => 0);
+  const progress = (i) => (bytes) => {
+    sent[i] = bytes;
+    const text = note?.querySelector("p");
+    if (big && text) text.textContent = `${label}… ${Math.round((100 * sent.reduce((a, b) => a + b, 0)) / total)}%`;
+  };
   try {
-    const tokens = await Promise.all(files.map(({ file }) => uploadDirect(file)));
+    const tokens = [];
+    for (let i = 0; i < files.length; i += 1) tokens.push(await uploadDirect(files[i].file, progress(i)));  // one at a time: kinder to slow connections
+    if (big && note?.querySelector("p")) note.querySelector("p").textContent = "Compressing and saving…";
     tokens.forEach((token, i) => {
       const hidden = document.createElement("input");
       hidden.type = "hidden";
@@ -197,7 +216,7 @@ document.addEventListener("submit", async (event) => {
       form.append(hidden);
     });
     inputs.forEach((input) => { input.disabled = true; input.dataset.directSent = "1"; });  // send tokens, not bytes
-    note?.remove?.();
+    if (!big) note?.remove?.();  // big files: keep "Compressing and saving…" up while the server works
     delete form.dataset.uploading;
     submitter?.removeAttribute("aria-busy");
     if (submitter && form.contains(submitter)) form.requestSubmit(submitter); else form.requestSubmit();
@@ -585,7 +604,10 @@ if (document.body.dataset.authenticated === "true") {
       const files = pending;
       if (directUploads && files.length) {
         try {
-          (await Promise.all(files.map(uploadDirect))).forEach((token) => data.append(DIRECT_PREFIX + "files", token));
+          const big = files.reduce((sum, f) => sum + f.size, 0) > 9 * 1024 * 1024;
+          const note = big ? toast("Uploading… this can take a minute for big files.") : null;
+          for (const f of files) data.append(DIRECT_PREFIX + "files", await uploadDirect(f));
+          note?.remove?.();
         } catch (err) {
           toast(err.message, "error");
           sending = false;

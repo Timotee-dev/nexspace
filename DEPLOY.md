@@ -1,5 +1,49 @@
 # Deploying NexSpace
 
+NexSpace runs on **Vercel** (free Hobby plan) or **Render**. The Vercel steps are first; the Render guide follows.
+
+## Deploying on Vercel (v0.15)
+
+Vercel runs NexSpace as a serverless function: no server to keep awake, and pages and static files load fast.
+It uses the same Supabase database, Cloudinary storage and Brevo email as Render, so nothing is lost when you move.
+
+**Limits on Vercel's free plan:**
+- **Uploads: 4 MB per form.** Vercel refuses anything bigger before it reaches NexSpace. The site tells people
+  the limit before they send. (Render allowed 100 MB because it compressed big files on the server.)
+- **Scheduled jobs** (reminders, trending, NexAI reading, OCR, push): Vercel's free cron runs them **once a day**.
+  For every 15 minutes, add the free cron-job.org step below.
+
+### 1. Import the project
+1. vercel.com → Add New… → Project → import `Timotee-dev/nexspace`. Vercel detects Django by itself; leave the
+   build settings as they are.
+2. Before pressing Deploy, open **Environment Variables** and add the same values you have on Render:
+   `SECRET_KEY`, `DATABASE_URL`, `BREVO_API_KEY`, `DEFAULT_FROM_EMAIL`, `CLOUDINARY_URL`, `OWNER_EMAIL`,
+   `OWNER_PASSWORD`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `OCR_SPACE_API_KEY`,
+   `ANTHROPIC_API_KEY` (if you use NexAI).
+   - **Do not copy** `SITE_URL`, `ALLOWED_HOSTS` or `CSRF_TRUSTED_ORIGINS` from Render: they point at onrender.com.
+     Vercel fills them in for `your-project.vercel.app`. Only set them when you add your own domain.
+   - `DATABASE_URL`: use Supabase's **Transaction pooler** string (port **6543**). NexSpace switches off the
+     things that pooler can't do automatically.
+   - Add **`CRON_SECRET`**: 20+ random letters and numbers (no spaces or symbols). It protects the scheduled-jobs URL.
+3. Deploy. Each production deploy applies database migrations and repairs the owner account (`vercel_build.py`).
+   Preview deploys (other branches) never touch the database.
+4. Settings → Functions → **Function Region**: pick the one nearest your Supabase region (for a Supabase project in
+   `eu-west-2`, choose London). Every page talks to the database, so this matters for speed.
+
+### 2. Scheduled jobs every 15 minutes (free, optional but recommended)
+`vercel.json` already runs them once a day. For reminders on time:
+1. cron-job.org → create a free account → Create cronjob.
+2. URL: `https://your-project.vercel.app/internal/run-scheduled/` (keep the slash at the end). Every 15 minutes.
+3. Advanced → Headers → add `Authorization` with the value `Bearer YOUR_CRON_SECRET`.
+4. Save and press "Test run": it should show `{"status": "ok", ...}`.
+
+### 3. After it works
+- Sign in with the owner account and open Admin → Platform: the health checks show Vercel, Cloudinary and Brevo.
+- The Android app: change its server address to the new Vercel address and rebuild it.
+- Then suspend the Render service (both can run at once on the same database while you test).
+
+# Deploying on Render
+
 This takes about an hour the first time. You need accounts on GitHub, Render, Supabase, Brevo and Cloudinary. Anthropic (NexAI) is optional.
 
 ## 1. Before you start (on your laptop)

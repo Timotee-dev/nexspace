@@ -23,5 +23,5 @@ def nexspace(request):
         dms = unread_messages(user)
 
     has_dashboard = bool(user is not None and user.is_authenticated and user.has_dashboard)
-    return {"max_document_mb": settings.MAX_DOCUMENT_MB, "has_dashboard": has_dashboard, "nexai_enabled": settings.NEXAI_ENABLED, "theme_preference": theme, "is_moderator": is_moderator, "is_dept_admin": is_dept_admin,
+    return {"hosting_name": settings.HOSTING_NAME, "max_request_mb": settings.MAX_REQUEST_MB, "max_document_mb": settings.MAX_DOCUMENT_MB, "has_dashboard": has_dashboard, "nexai_enabled": settings.NEXAI_ENABLED, "theme_preference": theme, "is_moderator": is_moderator, "is_dept_admin": is_dept_admin,
             "unread_notifications": unread, "unread_messages": dms}

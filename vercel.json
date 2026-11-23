@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "config/wsgi.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{tests/**,media/**,*.md,render.yaml,requirements-dev.txt,pytest.ini}"
+    }
+  },
+  "crons": [
+    { "path": "/internal/run-scheduled/", "schedule": "0 5 * * *" }
+  ]
+}

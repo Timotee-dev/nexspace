@@ -1,0 +1,30 @@
+# Used by Vercel (vercel.com) to build and run NexSpace. Local development still uses requirements.txt.
+[project]
+name = "nexspace"
+version = "0.15.0"
+description = "NexSpace: the digital home of the department"
+requires-python = ">=3.13"
+dependencies = [
+    "Django>=6.0,<6.1",
+    "djangorestframework>=3.16",
+    "django-filter>=25.1",
+    "drf-spectacular>=0.28",
+    "dj-database-url>=2.3",
+    "whitenoise>=6.9",
+    "Pillow>=11.3",
+    "python-dotenv>=1.1",
+    "cloudinary>=1.44",
+    "cryptography>=45.0",
+    "pypdf>=5.0",
+    "django-storages[s3]>=1.14",
+    "boto3>=1.35",
+    "pypdfium2>=4.30",
+    "psycopg[binary]>=3.2.10",
+]
+
+[tool.vercel]
+entrypoint = "config.wsgi:application"
+
+[tool.vercel.scripts]
+# Runs on every Vercel build, after the packages are installed (Vercel runs collectstatic by itself).
+build = "python vercel_build.py"

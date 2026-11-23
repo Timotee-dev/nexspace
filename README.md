@@ -124,6 +124,15 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Runs on Vercel (v0.15)
+- NexSpace deploys on **Vercel** as well as Render. Vercel detects Django from `manage.py`; `pyproject.toml` lists the
+  packages and Python 3.13, `vercel.json` sets the time limit and a daily cron, and `vercel_build.py` applies migrations
+  and repairs the owner account on production deploys. Static files are served from Vercel's CDN.
+- On Vercel: no database connections are kept open between requests, Supabase's transaction pooler is handled, the
+  visitor's address comes from Vercel's own headers, the site's address is filled in automatically, and uploads are
+  limited to 4 MB per form (Vercel's request limit; the browser checks before sending).
+- Step-by-step guide: DEPLOY.md → "Deploying on Vercel". Render keeps working exactly as before.
+
 ## Course reps per level, uploads, course requests and fun Spaces (v0.14)
 - **Course reps are per level, not per course.** In Admin → People → a person → Add role, choose *Course rep* and just pick the level (100–500). Each level can have **2 reps** (a rep and an assistant). A level's reps look after every course of that level. Existing course reps were moved to their course's level automatically.
 - **Only course reps, the course's lecturer and admins upload** course materials and past questions. Students don't see the Upload button; everyone can still read, download, rate and discuss.

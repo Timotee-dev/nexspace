@@ -22,10 +22,12 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-# On Render (which always sets RENDER=true) DEBUG is off unless explicitly turned on, so a missing
-# variable can never expose debug pages in production.
+# On Render (which always sets RENDER=true) and Vercel (VERCEL=1) DEBUG is off unless explicitly turned on,
+# so a missing variable can never expose debug pages in production.
 ON_RENDER = bool(os.environ.get("RENDER"))
-DEBUG = env_bool("DEBUG", not ON_RENDER)
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+HOSTING_NAME = "Vercel" if ON_VERCEL else "Render"
+DEBUG = env_bool("DEBUG", not (ON_RENDER or ON_VERCEL))
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
     if not DEBUG:
@@ -36,8 +38,19 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
 if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
     ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+# Vercel tells each deployment its own addresses: the production domain (your-project.vercel.app),
+# the deployment's unique URL and the branch URL. Allow them all, so it works before you add a custom domain.
+VERCEL_HOSTS = [h.strip().removeprefix("https://").rstrip("/") for h in (
+    os.environ.get("VERCEL_PROJECT_PRODUCTION_URL", ""), os.environ.get("VERCEL_URL", ""),
+    os.environ.get("VERCEL_BRANCH_URL", "")) if h.strip()]
+for _host in VERCEL_HOSTS:
+    if _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
+    if f"https://{_host}" not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{_host}")
 
-SITE_URL = os.environ.get("SITE_URL", "http://127.0.0.1:8000").rstrip("/")
+SITE_URL = os.environ.get("SITE_URL", "").strip().rstrip("/") or (
+    f"https://{VERCEL_HOSTS[0]}" if ON_VERCEL and VERCEL_HOSTS else "http://127.0.0.1:8000")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -108,8 +121,14 @@ WSGI_APPLICATION = "config.wsgi.application"
 # --- Database -------------------------------------------------------------
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
-    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True,
-                                                  ssl_require=not DEBUG)}
+    # On Vercel every request may land on a fresh, short-lived function: don't hold connections open
+    # (the database's connection limit would fill up). Use Supabase's pooler address there.
+    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=0 if ON_VERCEL else 600,
+                                                  conn_health_checks=not ON_VERCEL, ssl_require=not DEBUG)}
+    if DATABASES["default"].get("PORT") in (6543, "6543"):
+        # Supabase's transaction pooler (port 6543) can't keep server-side cursors or prepared statements.
+        DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+        DATABASES["default"].setdefault("OPTIONS", {})["prepare_threshold"] = None
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
 
@@ -137,7 +156,8 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Vercel's disk is read-only apart from /tmp, and /tmp is wiped often: set CLOUDINARY_URL there.
+MEDIA_ROOT = Path("/tmp/media") if ON_VERCEL else BASE_DIR / "media"
 
 # File storage, in order of preference:
 #   1. Supabase Storage (private bucket, signed links, up to 50 MB per file on the free plan)
@@ -185,8 +205,11 @@ STORAGES = {
 
 # Upload limits (Section 39 of the spec). Cloudinary's free plan rejects files over 10 MB.
 # Uploads up to MAX_UPLOAD_MB are accepted; big ones are compressed before storing (apps/core/uploads.py).
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "100"))
+# Vercel refuses any request bigger than 4.5 MB before it reaches NexSpace, so the default there is 4 MB.
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "4" if ON_VERCEL else "100"))
 MAX_IMAGE_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+# The browser checks that all the files in one form add up to less than this (0 = no check).
+MAX_REQUEST_MB = int(os.environ.get("MAX_REQUEST_MB", "4" if ON_VERCEL else "0"))
 MAX_DOCUMENT_MB = MAX_UPLOAD_MB
 MAX_DOCUMENT_UPLOAD_BYTES = MAX_DOCUMENT_MB * 1024 * 1024
 # What the file storage itself accepts per file, after compression. Cloudinary's free plan: 10 MB for images
@@ -238,7 +261,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "NexSpace API",
     "DESCRIPTION": "API for NexSpace — the digital home of the department.",
-    "VERSION": "0.14.0",
+    "VERSION": "0.15.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "PostKindEnum": "apps.posts.models.Post.Kind",

@@ -121,6 +121,25 @@ document.addEventListener("click", (event) => {
   btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
 });
 
+// ---------- Request size limit (Vercel refuses requests over 4.5 MB before they reach NexSpace) ----------
+const maxRequestMb = Number(document.body.dataset.maxRequestMb || 0);
+export function tooBigToSend(files) {
+  if (!maxRequestMb) return false;
+  const total = Array.from(files).reduce((sum, f) => sum + (f?.size || 0), 0);
+  return total > maxRequestMb * 1024 * 1024;
+}
+const tooBigMessage = () => `Files are too big to send together (max ${maxRequestMb} MB in total). Send fewer or smaller files.`;
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!maxRequestMb || !(form instanceof HTMLFormElement)) return;
+  const files = [...form.querySelectorAll('input[type="file"]')].flatMap((i) => [...(i.files || [])]);
+  if (files.length && tooBigToSend(files)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toast(tooBigMessage(), "error");
+  }
+}, true);
+
 // ---------- Busy state on submit (prevents double submits) ----------
 document.addEventListener("submit", (event) => {
   const form = event.target;
@@ -486,6 +505,7 @@ if (document.body.dataset.authenticated === "true") {
       if (sending) return;
       const body = box.value.trim();
       if (!body && !pending.length) return;
+      if (tooBigToSend(pending)) { toast(tooBigMessage(), "error"); return; }
       sending = true;
       const button = form.querySelector("button[type=submit]");
       button.disabled = true;
@@ -502,6 +522,7 @@ if (document.body.dataset.authenticated === "true") {
           method: "POST", credentials: "same-origin",
           headers: { Accept: "application/json", "X-CSRFToken": csrf() }, body: data,
         });
+        if (r.status === 413) throw new Error("Those files are too big to send. Try smaller or fewer files.");
         const json = await r.json();
         if (!r.ok) throw new Error(json?.error?.message || "Message not sent. Try again.");
         bubble(json.message);

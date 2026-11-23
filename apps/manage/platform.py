@@ -105,7 +105,7 @@ def system_health():
         ("Email", bool(settings.BREVO_API_KEY), "Brevo" if settings.BREVO_API_KEY else "Not set: emails only print to the server log"),
         ("File storage", bool(settings.FILE_STORAGE_NAME),
          f"{settings.FILE_STORAGE_NAME} · up to {settings.MAX_DOCUMENT_MB} MB per file" if settings.FILE_STORAGE_NAME
-         else "Local disk: uploads are lost on each Render deploy"),
+         else "Local disk: uploads are lost on each " + settings.HOSTING_NAME + " deploy"),
         ("Push notifications", settings.PUSH_ENABLED, "On" if settings.PUSH_ENABLED else "Off (no VAPID keys)"),
         ("NexAI answers", settings.NEXAI_ENABLED, settings.NEXAI_MODEL if settings.NEXAI_ENABLED else "Search-only (no API key)"),
         ("Production mode", not settings.DEBUG, "DEBUG is off" if not settings.DEBUG else "DEBUG is ON — never on the live site"),

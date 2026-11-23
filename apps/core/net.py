@@ -4,6 +4,9 @@ client_ip: on Render, traffic arrives through Cloudflare. Cloudflare sets CF-Con
 True-Client-IP to the visitor's real address and overwrites anything the visitor sent, so those are
 trustworthy. X-Forwarded-For is *not*: Render appends to whatever the visitor sent, so its first entry
 can be anything. Rate limits must never key on a value the visitor chooses.
+
+On Vercel there is no Cloudflare in front, so a visitor could send their own CF-Connecting-IP. Vercel
+overwrites X-Vercel-Forwarded-For / X-Real-IP with the visitor's real address, so only those are used there.
 """
 import ipaddress
 
@@ -19,7 +22,15 @@ def _valid(ip: str) -> str:
 
 
 def client_ip(request) -> str:
+    from django.conf import settings
+
     meta = request.META
+    if getattr(settings, "ON_VERCEL", False):
+        for header in ("HTTP_X_VERCEL_FORWARDED_FOR", "HTTP_X_REAL_IP", "HTTP_X_FORWARDED_FOR"):
+            ip = _valid((meta.get(header) or "").split(",")[0])
+            if ip:
+                return ip
+        return _valid(meta.get("REMOTE_ADDR", "")) or "unknown"
     for header in ("HTTP_CF_CONNECTING_IP", "HTTP_TRUE_CLIENT_IP"):
         ip = _valid(meta.get(header, ""))
         if ip:

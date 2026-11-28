@@ -244,23 +244,155 @@ window.addEventListener("pageshow", () => {
   document.querySelectorAll("form").forEach(resetDirect);  // coming back with the Back button: start fresh
 });
 
-// ---------- Avatar preview ----------
+// ---------- Profile photo: crop, zoom, remove ----------
+// Choosing a photo opens a square cropper (drag to move, slider to zoom). "Use photo" puts the cropped
+// 512 x 512 picture back into the file field, so the form uploads exactly what the person saw.
+const CROP_SIZE = 512;
+
+function openCropper(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const dialog = document.createElement("dialog");
+    dialog.className = "cropper";
+    dialog.setAttribute("aria-label", "Adjust your profile photo");
+    dialog.innerHTML = `
+      <h2 class="section-title">Adjust your photo</h2>
+      <p class="small muted">Drag to move it. Use the slider to zoom.</p>
+      <div class="cropper-stage" tabindex="0" aria-label="Photo position. Use the arrow keys to move it."><img alt="" draggable="false"></div>
+      <label class="cropper-zoom"><span class="small">Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"></label>
+      <div class="form-actions"><button type="button" class="btn btn-ghost btn-sm" data-crop-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" data-crop-use>Use photo</button></div>`;
+    document.body.append(dialog);
+    const stage = dialog.querySelector(".cropper-stage");
+    const img = stage.querySelector("img");
+    const zoom = dialog.querySelector("input[type=range]");
+    let natural = { w: 1, h: 1 }, scale = 1, base = 1, x = 0, y = 0, drag = null;
+
+    const box = () => stage.clientWidth;
+    const clamp = () => {  // the photo always covers the whole square
+      const w = natural.w * base * scale, h = natural.h * base * scale, s = box();
+      x = Math.min(0, Math.max(s - w, x));
+      y = Math.min(0, Math.max(s - h, y));
+    };
+    const draw = () => {
+      clamp();
+      img.style.width = `${natural.w * base * scale}px`;
+      img.style.height = `${natural.h * base * scale}px`;
+      img.style.transform = `translate(${x}px, ${y}px)`;
+    };
+    const finish = (result) => {
+      dialog.close();
+      dialog.remove();
+      URL.revokeObjectURL(url);
+      resolve(result);
+    };
+
+    img.addEventListener("load", () => {
+      natural = { w: img.naturalWidth, h: img.naturalHeight };
+      base = box() / Math.min(natural.w, natural.h);  // smallest side fills the square
+      x = (box() - natural.w * base) / 2;
+      y = (box() - natural.h * base) / 2;
+      draw();
+    });
+    img.addEventListener("error", () => { toast("That photo couldn't be opened. Try a JPEG or PNG.", "error"); finish(null); });
+    img.src = url;
+
+    zoom.addEventListener("input", () => {
+      const s = box(), cx = (s / 2 - x) / scale, cy = (s / 2 - y) / scale;  // zoom around the centre
+      scale = Number(zoom.value);
+      x = s / 2 - cx * scale;
+      y = s / 2 - cy * scale;
+      draw();
+    });
+    stage.addEventListener("pointerdown", (e) => { drag = { px: e.clientX, py: e.clientY, x, y }; stage.setPointerCapture(e.pointerId); });
+    stage.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      x = drag.x + e.clientX - drag.px;
+      y = drag.y + e.clientY - drag.py;
+      draw();
+    });
+    stage.addEventListener("pointerup", () => { drag = null; });
+    stage.addEventListener("pointercancel", () => { drag = null; });
+    stage.addEventListener("keydown", (e) => {
+      const step = { ArrowLeft: [10, 0], ArrowRight: [-10, 0], ArrowUp: [0, 10], ArrowDown: [0, -10] }[e.key];
+      if (step) { e.preventDefault(); x += step[0]; y += step[1]; draw(); }
+    });
+    dialog.querySelector("[data-crop-cancel]").addEventListener("click", () => finish(null));
+    dialog.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });  // Esc key
+    dialog.querySelector("[data-crop-use]").addEventListener("click", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = CROP_SIZE;
+      const sx = -x / (base * scale), sy = -y / (base * scale), side = box() / (base * scale);
+      canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, CROP_SIZE, CROP_SIZE);
+      canvas.toBlob((blob) => {
+        if (!blob) { finish(null); return; }
+        const name = (file.name.replace(/\.[^.]+$/, "") || "photo") + ".jpg";
+        finish(new File([blob], name, { type: "image/jpeg" }));
+      }, "image/jpeg", 0.9);
+    });
+    dialog.showModal();
+    stage.focus();
+  });
+}
+
 document.querySelectorAll("[data-avatar-input]").forEach((input) => {
-  input.addEventListener("change", () => {
-    const file = input.files?.[0];
-    const preview = document.querySelector("[data-avatar-preview]");
-    if (!file || !preview) return;
-    const maxMb = Number(document.body.dataset.maxDocMb || 100);
-    if (file.size > maxMb * 1024 * 1024) {
-      toast(`Images must be ${maxMb} MB or smaller.`, "error");
-      input.value = "";
-      return;
-    }
+  const preview = document.querySelector("[data-avatar-preview]");
+  const actions = input.closest(".avatar-edit-actions");
+  const original = preview?.innerHTML;
+  let chosen = null;  // the photo as picked, so "Adjust" can re-crop from the full picture
+
+  const tools = document.createElement("div");
+  tools.className = "avatar-picked";
+  tools.hidden = true;
+  tools.innerHTML = `<button type="button" class="btn btn-quiet btn-sm" data-avatar-adjust>Adjust</button>
+    <button type="button" class="btn btn-quiet btn-sm" data-avatar-clear aria-label="Remove the photo you chose">\u00d7 Remove</button>`;
+  actions?.insertBefore(tools, actions.querySelector(".field-help"));
+
+  const show = (file) => {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
     const img = document.createElement("img");
     img.alt = "New profile photo preview";
     img.src = URL.createObjectURL(file);
-    preview.replaceChildren(img);
+    img.className = "avatar-new";
+    preview?.replaceChildren(img);
+    tools.hidden = false;
+  };
+  const clear = () => {
+    input.value = "";
+    chosen = null;
+    if (preview) preview.innerHTML = original;
+    tools.hidden = true;
+  };
+  const crop = async (file) => {
+    const cropped = await openCropper(file);
+    if (cropped) show(cropped);
+    else if (!input.dataset.cropped) clear();
+    if (cropped) input.dataset.cropped = "1";
+  };
+
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const maxMb = Number(document.body.dataset.maxDocMb || 100);
+    if (file.size > maxMb * 1024 * 1024) {
+      toast(`Images must be ${maxMb} MB or smaller.`, "error");
+      clear();
+      return;
+    }
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      toast("Choose a JPEG, PNG or WebP photo.", "error");
+      clear();
+      return;
+    }
+    chosen = file;
+    delete input.dataset.cropped;
+    if (typeof HTMLDialogElement === "function" && "DataTransfer" in window) crop(file);
+    else show(file);  // very old browsers: upload as chosen (the server still resizes it)
   });
+  tools.querySelector("[data-avatar-adjust]").addEventListener("click", () => chosen && crop(chosen));
+  tools.querySelector("[data-avatar-clear]").addEventListener("click", clear);
 });
 
 // ---------- Character counters ----------

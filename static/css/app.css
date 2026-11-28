@@ -1276,3 +1276,16 @@ label.chip { display: inline-flex; cursor: pointer; }
 .people-list { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); max-height: 340px; overflow-y: auto; }
 .people-list li[hidden] { display: none; }
 .people-picker input[type=search] { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--ink); color: var(--text); font-size: 16px; width: 100%; }
+
+/* Profile photo cropper */
+.cropper { border: 1px solid var(--line); border-radius: var(--r-lg, 16px); background: var(--surface); color: var(--text);
+  padding: var(--s5, 20px); width: min(92vw, 380px); box-shadow: var(--shadow); }
+.cropper::backdrop { background: rgba(0, 0, 0, 0.6); }
+.cropper-stage { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 50%; margin: var(--s3) 0;
+  background: var(--ink); touch-action: none; cursor: grab; outline-offset: 3px; }
+.cropper-stage:active { cursor: grabbing; }
+.cropper-stage img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
+.cropper-zoom { display: flex; align-items: center; gap: var(--s3); }
+.cropper-zoom input { flex: 1; accent-color: var(--marker); }
+.avatar-picked { display: flex; gap: var(--s2); flex-wrap: wrap; }
+[data-avatar-preview] img.avatar-new { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; display: block; }

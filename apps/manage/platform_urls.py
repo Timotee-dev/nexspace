@@ -7,6 +7,7 @@ app_name = "platform"
 urlpatterns = [
     path("platform/", views.overview_view, name="overview"),
     path("platform/run-jobs/", views.run_jobs_view, name="run-jobs"),
+    path("platform/test-email/", views.test_email_view, name="test-email"),
     path("platform/activity/", views.activity_view, name="activity"),
     path("platform/people/", views.people_view, name="people"),
     path("platform/staff/", views.staff_view, name="staff"),

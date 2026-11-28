@@ -7,7 +7,10 @@
 
 <section class="dash-section" aria-labelledby="health-title">
   <div class="panel-head"><h2 id="health-title" class="section-title">System health</h2>
-    <form method="post" action="{% url 'platform:run-jobs' %}">{% csrf_token %}<button class="btn btn-ghost btn-sm">Run scheduled jobs now</button></form></div>
+    <div class="inline-form" style="display:flex;gap:8px;flex-wrap:wrap">
+      <form method="post" action="{% url 'platform:test-email' %}">{% csrf_token %}<button class="btn btn-ghost btn-sm">Send test email</button></form>
+      <form method="post" action="{% url 'platform:run-jobs' %}">{% csrf_token %}<button class="btn btn-ghost btn-sm">Run scheduled jobs now</button></form>
+    </div></div>
   <ul class="health-grid">
     {% for name, ok, detail in health %}<li class="health {% if ok %}ok{% else %}warn{% endif %}"><span class="health-dot" aria-hidden="true"></span><span><b>{{ name }}</b><span class="small muted">{% if ok %}OK · {% else %}Check · {% endif %}{{ detail }}</span></span></li>{% endfor %}
   </ul>

@@ -102,7 +102,10 @@ def system_health():
     except Exception as exc:  # pragma: no cover
         checks.append(("Cache", False, str(exc)[:120]))
     checks += [
-        ("Email", bool(settings.BREVO_API_KEY), "Brevo" if settings.BREVO_API_KEY else "Not set: emails only print to the server log"),
+        ("Email", bool(settings.BREVO_API_KEY) and "example.com" not in settings.DEFAULT_FROM_EMAIL,
+         (f"Brevo · from {settings.DEFAULT_FROM_EMAIL}" if "example.com" not in settings.DEFAULT_FROM_EMAIL
+          else "DEFAULT_FROM_EMAIL is not set: Brevo will refuse the placeholder sender")
+         if settings.BREVO_API_KEY else "Not set: emails only print to the server log"),
         ("File storage", bool(settings.FILE_STORAGE_NAME),
          f"{settings.FILE_STORAGE_NAME} · up to {settings.MAX_DOCUMENT_MB} MB per file" if settings.FILE_STORAGE_NAME
          else "Local disk: uploads are lost on each " + settings.HOSTING_NAME + " deploy"),
@@ -110,6 +113,12 @@ def system_health():
         ("NexAI answers", settings.NEXAI_ENABLED, settings.NEXAI_MODEL if settings.NEXAI_ENABLED else "Search-only (no API key)"),
         ("Production mode", not settings.DEBUG, "DEBUG is off" if not settings.DEBUG else "DEBUG is ON — never on the live site"),
     ]
+    from apps.core.email import LAST_FAILURE_KEY
+
+    failure = cache.get(LAST_FAILURE_KEY)
+    if failure:
+        when = timezone.localtime(timezone.datetime.fromisoformat(failure["at"]))
+        checks.append(("Last email failed", False, f"{when:%-d %b, %H:%M}: {failure['why']}"))
     last = cache.get("last-scheduled-run")
     if last:
         at = timezone.datetime.fromisoformat(last["at"])
@@ -222,6 +231,29 @@ def run_jobs_view(request):
 
     result = run_all()
     messages.success(request, f"Scheduled jobs ran: {result}")
+    return redirect("platform:overview")
+
+
+@platform_required
+@require_POST
+def test_email_view(request):
+    """Send a test email to the owner and show exactly what the email provider said."""
+    from django.core.mail import EmailMessage
+
+    if not settings.BREVO_API_KEY:
+        messages.error(request, "Email isn't set up: add BREVO_API_KEY and DEFAULT_FROM_EMAIL in your hosting "
+                                "settings, then redeploy.")
+        return redirect("platform:overview")
+    try:
+        EmailMessage(subject="NexSpace test email",
+                     body="If you can read this, NexSpace can send emails (verification codes, password resets).",
+                     to=[request.user.email]).send(fail_silently=False)
+    except Exception as exc:
+        messages.error(request, f"The test email failed. {exc}")
+    else:
+        messages.success(request, f"Test email sent to {request.user.email} from {settings.DEFAULT_FROM_EMAIL}. "
+                                  "If it isn't in your inbox within a minute, check Spam, then Brevo \u2192 "
+                                  "Transactional \u2192 Logs.")
     return redirect("platform:overview")
 
 

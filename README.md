@@ -124,6 +124,15 @@ New API endpoints: `/api/posts/` (list by tab, create with JSON or multipart), `
 - **Email digests:** a summary email — upcoming exams and deadlines, unread messages and notifications, new announcements, new materials in your courses, popular posts — **weekly by default** (Mondays from 7am), or daily, or off (Settings → Notifications → Summary email). Nobody gets an empty digest. At most `DIGEST_DAILY_CAP` (250) go out a day to stay under Brevo's free 300/day; the rest go on the next run. Every digest has a one-click unsubscribe link (it asks for a real click, so email link-scanners can't unsubscribe people).
 - **Live updates without paid servers:** chats update every 3 seconds, notification and message badges every 15 seconds, and "Show N new posts" / "Show N new comments" bars appear on the feed and posts — all without refreshing, and nothing runs while the tab is in the background. (True WebSockets need a paid always-on server plus Redis; this works on the free plan. It can be swapped for WebSockets later without changing the pages.)
 
+## Executive testing fixes (v0.20)
+- **Profile photo cropper:** choosing a photo opens a round cropper (drag to move, slider to zoom, arrow keys
+  too). The cropped 512 × 512 photo is what gets uploaded. After choosing, **Adjust** re-opens the cropper and
+  **× Remove** takes the chosen photo back off before saving.
+- **Email problems are explained:** Admin → Platform has a **Send test email** button that shows exactly what Brevo
+  said, with the fix for the usual causes (Brevo blocking the server's address under Security → Authorised IPs,
+  a wrong API key, or an unverified sender in DEFAULT_FROM_EMAIL). The last failed email also shows in the health
+  checks until an email goes through again.
+
 ## Audit fixes (v0.19)
 A full check of the site as 13 kinds of user (owner, admins, reps, lecturers, students of different levels,
 unverified, suspended, other departments, signed out) found no redirect loops, no crashes and no slow pages,

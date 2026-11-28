@@ -1,6 +1,12 @@
 // Composer enhancements: poll options, attachment previews with remove,
 // topic limit, and a local draft so nothing is lost on refresh.
-import { toast } from "./app.js";
+import { openCropper, toast } from "./app.js";
+
+const POST_CROP = {
+  title: "Crop picture",
+  shapes: [{ label: "Original", ratio: null }, { label: "Square", ratio: 1 }, { label: "Portrait 4:5", ratio: 4 / 5 },
+           { label: "Landscape 16:9", ratio: 16 / 9 }],
+};
 
 const form = document.querySelector("[data-composer]");
 if (form) {
@@ -36,6 +42,7 @@ if (form) {
   // ---- Attachments with previews and remove buttons ----
   const preview = form.querySelector("[data-attach-preview]");
   const selected = { images: [], files: [] };
+  const originals = new Map();  // cropped picture -> the picture as chosen, so cropping again starts from all of it
   const inputs = Object.fromEntries([...form.querySelectorAll("[data-attach]")].map((i) => [i.dataset.attach, i]));
 
   const syncInput = (kind) => {
@@ -63,10 +70,31 @@ if (form) {
         remove.setAttribute("aria-label", `Remove ${file.name}`);
         remove.addEventListener("click", () => {
           selected[kind].splice(index, 1);
+          originals.delete(file);
           syncInput(kind);
           renderPreview();
         });
         li.append(remove);
+        if (kind === "images" && typeof HTMLDialogElement === "function") {
+          const crop = document.createElement("button");
+          crop.type = "button";
+          crop.className = "attach-crop";
+          crop.textContent = "Crop";
+          crop.setAttribute("aria-label", `Crop picture ${index + 1}`);
+          crop.addEventListener("click", async () => {
+            const source = originals.get(file) || file;
+            const cropped = await openCropper(source, POST_CROP);
+            if (!cropped) return;
+            const at = selected.images.indexOf(file);
+            if (at < 0) return;
+            selected.images[at] = cropped;
+            originals.delete(file);
+            originals.set(cropped, source);
+            syncInput("images");
+            renderPreview();
+          });
+          li.append(crop);
+        }
         preview.append(li);
       });
     }

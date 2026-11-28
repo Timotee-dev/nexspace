@@ -1279,11 +1279,19 @@ label.chip { display: inline-flex; cursor: pointer; }
 
 /* Profile photo cropper */
 .cropper { border: 1px solid var(--line); border-radius: var(--r-lg, 16px); background: var(--surface); color: var(--text);
-  padding: var(--s5, 20px); width: min(92vw, 380px); box-shadow: var(--shadow); }
+  padding: var(--s5, 20px); width: min(92vw, 420px); box-shadow: var(--shadow); }
 .cropper::backdrop { background: rgba(0, 0, 0, 0.6); }
-.cropper-stage { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 50%; margin: var(--s3) 0;
+.cropper-stage { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--r-sm, 8px); margin: var(--s3) 0;
+  max-height: 60vh;
   background: var(--ink); touch-action: none; cursor: grab; outline-offset: 3px; }
+.cropper-stage.round { border-radius: 50%; }
 .cropper-stage:active { cursor: grabbing; }
+.cropper-shapes { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.crop-shape { min-height: 36px; padding: 0 var(--s3); border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.crop-shape[aria-pressed="true"] { background: var(--marker); color: var(--marker-ink); border-color: var(--marker); font-weight: 600; }
+.attach-preview button.attach-crop { top: auto; right: auto; bottom: 4px; left: 4px; width: auto; height: 28px; padding: 0 10px;
+  border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600; }
 .cropper-stage img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
 .cropper-zoom { display: flex; align-items: center; gap: var(--s3); }
 .cropper-zoom input { flex: 1; accent-color: var(--marker); }

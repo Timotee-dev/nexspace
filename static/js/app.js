@@ -244,35 +244,41 @@ window.addEventListener("pageshow", () => {
   document.querySelectorAll("form").forEach(resetDirect);  // coming back with the Back button: start fresh
 });
 
-// ---------- Profile photo: crop, zoom, remove ----------
-// Choosing a photo opens a square cropper (drag to move, slider to zoom). "Use photo" puts the cropped
-// 512 x 512 picture back into the file field, so the form uploads exactly what the person saw.
-const CROP_SIZE = 512;
-
-function openCropper(file) {
+// ---------- Photo cropper (profile photos and post pictures) ----------
+// openCropper(file, options) shows the photo in a frame: drag to move, slider (or arrow keys) to zoom and move.
+// Resolves with the cropped photo as a JPEG File, or null if cancelled.
+//   shapes: [{label, ratio}] to choose from (ratio = width / height; null = the photo's own shape)
+//   round:  show a round frame (profile photos)
+//   size:   fixed output width (profile photos); otherwise up to 2048 px wide, never enlarged
+export function openCropper(file, { shapes = [{ label: "Square", ratio: 1 }], round = false, size = null,
+                                    title = "Adjust your photo" } = {}) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const dialog = document.createElement("dialog");
     dialog.className = "cropper";
-    dialog.setAttribute("aria-label", "Adjust your profile photo");
+    dialog.setAttribute("aria-label", title);
     dialog.innerHTML = `
-      <h2 class="section-title">Adjust your photo</h2>
+      <h2 class="section-title"></h2>
       <p class="small muted">Drag to move it. Use the slider to zoom.</p>
-      <div class="cropper-stage" tabindex="0" aria-label="Photo position. Use the arrow keys to move it."><img alt="" draggable="false"></div>
+      <div class="cropper-shapes" role="group" aria-label="Shape"></div>
+      <div class="cropper-stage${round ? " round" : ""}" tabindex="0" aria-label="Photo position. Use the arrow keys to move it."><img alt="" draggable="false"></div>
       <label class="cropper-zoom"><span class="small">Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"></label>
       <div class="form-actions"><button type="button" class="btn btn-ghost btn-sm" data-crop-cancel>Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" data-crop-use>Use photo</button></div>`;
+    dialog.querySelector("h2").textContent = title;
     document.body.append(dialog);
     const stage = dialog.querySelector(".cropper-stage");
     const img = stage.querySelector("img");
     const zoom = dialog.querySelector("input[type=range]");
-    let natural = { w: 1, h: 1 }, scale = 1, base = 1, x = 0, y = 0, drag = null;
+    const shapeBar = dialog.querySelector(".cropper-shapes");
+    let natural = { w: 1, h: 1 }, ratio = 1, scale = 1, base = 1, x = 0, y = 0, drag = null, loaded = false;
 
-    const box = () => stage.clientWidth;
-    const clamp = () => {  // the photo always covers the whole square
-      const w = natural.w * base * scale, h = natural.h * base * scale, s = box();
-      x = Math.min(0, Math.max(s - w, x));
-      y = Math.min(0, Math.max(s - h, y));
+    const W = () => stage.clientWidth;
+    const H = () => stage.clientHeight;
+    const clamp = () => {  // the photo always fills the whole frame
+      const w = natural.w * base * scale, h = natural.h * base * scale;
+      x = Math.min(0, Math.max(W() - w, x));
+      y = Math.min(0, Math.max(H() - h, y));
     };
     const draw = () => {
       clamp();
@@ -280,6 +286,30 @@ function openCropper(file) {
       img.style.height = `${natural.h * base * scale}px`;
       img.style.transform = `translate(${x}px, ${y}px)`;
     };
+    const layout = () => {  // fit the photo to the frame's shape, centred, zoom reset
+      stage.style.aspectRatio = String(ratio);
+      base = Math.max(W() / natural.w, H() / natural.h);
+      scale = 1;
+      zoom.value = "1";
+      x = (W() - natural.w * base) / 2;
+      y = (H() - natural.h * base) / 2;
+      draw();
+    };
+    const pick = (shape, button) => {
+      ratio = shape.ratio || natural.w / natural.h;
+      shapeBar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+      layout();
+    };
+    shapes.forEach((shape, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "crop-shape";
+      b.textContent = shape.label;
+      b.setAttribute("aria-pressed", String(i === 0));
+      b.addEventListener("click", () => loaded && pick(shape, b));
+      shapeBar.append(b);
+    });
+    shapeBar.hidden = shapes.length < 2;
     const finish = (result) => {
       dialog.close();
       dialog.remove();
@@ -289,19 +319,17 @@ function openCropper(file) {
 
     img.addEventListener("load", () => {
       natural = { w: img.naturalWidth, h: img.naturalHeight };
-      base = box() / Math.min(natural.w, natural.h);  // smallest side fills the square
-      x = (box() - natural.w * base) / 2;
-      y = (box() - natural.h * base) / 2;
-      draw();
+      loaded = true;
+      pick(shapes[0], shapeBar.querySelector("button"));
     });
     img.addEventListener("error", () => { toast("That photo couldn't be opened. Try a JPEG or PNG.", "error"); finish(null); });
     img.src = url;
 
     zoom.addEventListener("input", () => {
-      const s = box(), cx = (s / 2 - x) / scale, cy = (s / 2 - y) / scale;  // zoom around the centre
+      const cx = (W() / 2 - x) / scale, cy = (H() / 2 - y) / scale;  // zoom around the centre
       scale = Number(zoom.value);
-      x = s / 2 - cx * scale;
-      y = s / 2 - cy * scale;
+      x = W() / 2 - cx * scale;
+      y = H() / 2 - cy * scale;
       draw();
     });
     stage.addEventListener("pointerdown", (e) => { drag = { px: e.clientX, py: e.clientY, x, y }; stage.setPointerCapture(e.pointerId); });
@@ -320,10 +348,17 @@ function openCropper(file) {
     dialog.querySelector("[data-crop-cancel]").addEventListener("click", () => finish(null));
     dialog.addEventListener("cancel", (e) => { e.preventDefault(); finish(null); });  // Esc key
     dialog.querySelector("[data-crop-use]").addEventListener("click", () => {
+      const k = base * scale;  // screen pixels per photo pixel
+      const sx = -x / k, sy = -y / k, sw = W() / k, sh = H() / k;
+      const outW = Math.round(size || Math.min(2048, sw));
+      const outH = Math.round(outW / ratio);
       const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = CROP_SIZE;
-      const sx = -x / (base * scale), sy = -y / (base * scale), side = box() / (base * scale);
-      canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, CROP_SIZE, CROP_SIZE);
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";  // see-through parts of a PNG become white, not black
+      ctx.fillRect(0, 0, outW, outH);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
       canvas.toBlob((blob) => {
         if (!blob) { finish(null); return; }
         const name = (file.name.replace(/\.[^.]+$/, "") || "photo") + ".jpg";
@@ -334,6 +369,8 @@ function openCropper(file) {
     stage.focus();
   });
 }
+
+const AVATAR_CROP = { shapes: [{ label: "Square", ratio: 1 }], round: true, size: 512, title: "Adjust your photo" };
 
 document.querySelectorAll("[data-avatar-input]").forEach((input) => {
   const preview = document.querySelector("[data-avatar-preview]");
@@ -366,7 +403,7 @@ document.querySelectorAll("[data-avatar-input]").forEach((input) => {
     tools.hidden = true;
   };
   const crop = async (file) => {
-    const cropped = await openCropper(file);
+    const cropped = await openCropper(file, AVATAR_CROP);
     if (cropped) show(cropped);
     else if (!input.dataset.cropped) clear();
     if (cropped) input.dataset.cropped = "1";
